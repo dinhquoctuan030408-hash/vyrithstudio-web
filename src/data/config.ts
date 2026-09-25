@@ -1,3 +1,26 @@
+export interface AppItem {
+  id: string;
+  name: string;
+  category: string;
+  rating: number;
+  description: string;
+  icon: string;
+  version: string;
+  downloadUrl: string;
+}
+
+export type ProjectStatus = 'In Development' | 'Alpha' | 'Beta' | 'Completed';
+
+export interface UpcomingProject {
+  id: string;
+  name: string;
+  tagline: string;
+  status: ProjectStatus;
+  progress: number;
+  icon: string;
+  techStack: string[];
+  projectUrl: string;
+}
 export const STUDIO_CONFIG = {
   founder: {
     uid: "VYR-FOUNDER-0001",
@@ -89,5 +112,5 @@ export const STUDIO_CONFIG = {
       techStack: ['Luau'],
       projectUrl: 'https://vyrithstudio.id.vn/project'
     }
-  ]
+  ] as UpcomingProject[]
 };
