@@ -105,7 +105,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "C:\\Users\\Quoc Tuan\\Desktop\\Dự án\\vyrith-studio-webportal",
+    "outputFileTracingRoot": "C:\\Users\\Quoc Tuan\\Desktop\\Du An\\vyrith-studio-webportal",
     "enablePrerenderSourceMaps": true,
     "cacheComponents": false,
     "cacheLife": {
@@ -323,13 +323,13 @@
     "eslint": {
       "ignoreDuringBuilds": true
     },
-    "repoRoot": "C:\\Users\\Quoc Tuan\\Desktop\\Dự án\\vyrith-studio-webportal",
+    "repoRoot": "C:\\Users\\Quoc Tuan\\Desktop\\Du An\\vyrith-studio-webportal",
     "turbopack": {
-      "root": "C:\\Users\\Quoc Tuan\\Desktop\\Dự án\\vyrith-studio-webportal"
+      "root": "C:\\Users\\Quoc Tuan\\Desktop\\Du An\\vyrith-studio-webportal"
     },
     "distDirRoot": ".next"
   },
-  "appDir": "C:\\Users\\Quoc Tuan\\Desktop\\Dự án\\vyrith-studio-webportal",
+  "appDir": "C:\\Users\\Quoc Tuan\\Desktop\\Du An\\vyrith-studio-webportal",
   "relativeAppDir": "",
   "files": [
     ".next\\package.json",

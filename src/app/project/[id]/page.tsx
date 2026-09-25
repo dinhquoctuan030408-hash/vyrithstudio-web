@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import StudioIcon from '@/components/StudioIcon';
 import StatusBadge from '@/components/StatusBadge';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { useAuth } from '@/context/AuthContext';
 import { getLiveProjectById } from '@/data/projectManager';
 import { UpcomingProject, ProjectAttachment } from '@/data/config';
@@ -144,24 +145,26 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* Overview & Detailed Docs */}
-      <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-8 rounded-2xl space-y-6">
-        <div>
-          <h2 className="text-lg font-bold text-white mb-2">Project Overview</h2>
-          <p className="text-xs sm:text-sm text-[#94A3B8] leading-relaxed">
-            {project.overview || project.tagline}
-          </p>
-        </div>
-
-        {project.detailedDocs && (
-          <div className="pt-4 border-t border-white/[0.08]">
-            <h2 className="text-lg font-bold text-white mb-3">Specifications & Documentation</h2>
-            <div className="p-4 rounded-xl bg-[#090D16] border border-white/10 text-xs sm:text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
-              {project.detailedDocs}
-            </div>
-          </div>
-        )}
+      {/* Overview */}
+      <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-8 rounded-2xl space-y-3">
+        <h2 className="text-lg font-bold text-white">Project Overview</h2>
+        <p className="text-xs sm:text-sm text-[#94A3B8] leading-relaxed">
+          {project.overview || project.tagline}
+        </p>
       </div>
+
+      {/* Specifications & Documentation With Full Markdown & Math Parser */}
+      {project.detailedDocs && (
+        <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-8 rounded-2xl space-y-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <FileText className="w-5 h-5 text-blue-400" />
+            <span>Specifications & Documentation</span>
+          </h2>
+          <div className="p-5 sm:p-7 rounded-2xl bg-[#090D16]/90 border border-white/10 shadow-inner">
+            <MarkdownRenderer content={project.detailedDocs} />
+          </div>
+        </div>
+      )}
 
       {/* Attachments */}
       <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-8 rounded-2xl space-y-4">

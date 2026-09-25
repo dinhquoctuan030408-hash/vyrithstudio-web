@@ -18,14 +18,14 @@ export const getLiveProjects = (): UpcomingProject[] => {
 };
 
 export const getLiveProjectById = (id: string): UpcomingProject | undefined => {
-  return getLiveProjects().find(p => p.id === id);
+  const projects = getLiveProjects();
+  return projects.find(p => p.id === id);
 };
 
 export const saveLiveProjects = async (projects: UpcomingProject[]): Promise<void> => {
   if (typeof window !== 'undefined') {
     localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
   }
-  // Đồng bộ lên Cloud Database
   try {
     await fetch('/api/studio/data', {
       method: 'POST',
@@ -52,7 +52,6 @@ export const saveLiveApps = async (apps: AppItem[]): Promise<void> => {
   if (typeof window !== 'undefined') {
     localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(apps));
   }
-  // Đồng bộ lên Cloud Database
   try {
     await fetch('/api/studio/data', {
       method: 'POST',
@@ -76,7 +75,6 @@ export const saveFeedbackThreads = async (threads: FeedbackThread[]): Promise<vo
   if (typeof window !== 'undefined') {
     localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(threads));
   }
-  // Đồng bộ lên Cloud Database
   try {
     await fetch('/api/studio/data', {
       method: 'POST',
@@ -147,7 +145,7 @@ export const replyFeedbackMessage = async (userId: string, content: string): Pro
   return replyMsg;
 };
 
-// 4. GLOBAL CLOUD SYNC FETCHER (Gọi khi load trang trên bất kỳ thiết bị nào)
+// 4. FETCH VÀ ĐỒNG BỘ THÔNG MINH (Chỉ cập nhật khi Cloud có dữ liệu thực)
 export const fetchAndSyncCloudData = async (): Promise<{
   projects: UpcomingProject[];
   apps: AppItem[];
@@ -158,11 +156,21 @@ export const fetchAndSyncCloudData = async (): Promise<{
     const json = await res.json();
     if (json.success) {
       if (typeof window !== 'undefined') {
-        localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(json.projects));
-        localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(json.apps));
-        localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(json.feedbacks));
+        if (json.projects && json.projects.length > 0) {
+          localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(json.projects));
+        }
+        if (json.apps && json.apps.length > 0) {
+          localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(json.apps));
+        }
+        if (json.feedbacks) {
+          localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(json.feedbacks));
+        }
       }
-      return json;
+      return {
+        projects: json.projects || getLiveProjects(),
+        apps: json.apps || getLiveApps(),
+        feedbacks: json.feedbacks || getFeedbackThreads(),
+      };
     }
   } catch (e) {}
 

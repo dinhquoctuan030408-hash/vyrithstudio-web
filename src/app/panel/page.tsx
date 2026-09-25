@@ -183,17 +183,24 @@ export default function FounderPanelPage() {
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProj) return;
+
     let updated: UpcomingProject[];
     if (isCreatingProj) {
-      updated = [...projects, { ...editingProj, projectUrl: `/project/${editingProj.id}` }];
+      const newProj = {
+        ...editingProj,
+        id: editingProj.id || ('proj-' + Date.now().toString(36)),
+        projectUrl: `/project/${editingProj.id || ('proj-' + Date.now().toString(36))}`
+      };
+      updated = [...projects, newProj];
     } else {
       updated = projects.map(p => p.id === editingProj.id ? editingProj : p);
     }
+
     setProjects(updated);
     await saveLiveProjects(updated);
     setEditingProj(null);
     setIsCreatingProj(false);
-    setSuccessMsg('Project synchronized across all cloud instances.');
+    setSuccessMsg('Project saved and markdown synchronized successfully.');
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
