@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
-import { useLanguage } from '@/context/LanguageContext';
 import { 
   User, 
   Mail, 
@@ -24,7 +23,6 @@ import {
 
 export default function ProfilePage() {
   const { user, updateProfile, changePassword, sendEmailOtp } = useAuth();
-  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState('');
@@ -37,7 +35,6 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passOtp, setPassOtp] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(0);
-  const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
 
   const [copiedUid, setCopiedUid] = useState(false);
@@ -76,19 +73,18 @@ export default function ProfilePage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setInfoError(t.profile.errorFill);
+      setInfoError('Please select a valid image file.');
       return;
     }
 
     if (file.size > 3 * 1024 * 1024) {
-      setInfoError('Dung lượng ảnh tối đa là 3MB.');
+      setInfoError('Image size cannot exceed 3MB.');
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result as string;
-      setAvatar(result);
+      setAvatar(reader.result as string);
       setInfoError('');
     };
     reader.readAsDataURL(file);
@@ -106,18 +102,17 @@ export default function ProfilePage() {
     setInfoSuccess('');
 
     if (!name.trim() || !phone.trim()) {
-      setInfoError(t.profile.errorFill);
+      setInfoError('Please fill in your name and phone number.');
       return;
     }
 
     updateProfile({ name: name.trim(), phone: phone.trim(), avatar });
-    setInfoSuccess(t.profile.successInfo);
+    setInfoSuccess('Profile information updated successfully.');
     setTimeout(() => setInfoSuccess(''), 4000);
   };
 
   const handleRequestPassOtp = async () => {
-    if (!user?.email) return;
-    if (otpCountdown > 0) return;
+    if (!user?.email || otpCountdown > 0) return;
 
     setPassError('');
     setPassSuccess('');
@@ -127,11 +122,10 @@ export default function ProfilePage() {
     setSendingOtp(false);
 
     if (res.success) {
-      setOtpSent(true);
       setOtpCountdown(60);
-      setPassSuccess(t.auth.otpSentSuccess);
+      setPassSuccess('6-digit OTP code has been sent to your email.');
     } else {
-      setPassError(res.error || 'Không thể gửi mã OTP.');
+      setPassError(res.error || 'Failed to dispatch OTP.');
     }
   };
 
@@ -141,34 +135,34 @@ export default function ProfilePage() {
     setPassSuccess('');
 
     if (!oldPassword || !newPassword || !confirmPassword) {
-      setPassError(t.profile.errorFill);
+      setPassError('Please fill in all password fields.');
       return;
     }
 
     if (newPassword.length < 6) {
-      setPassError(t.profile.errorPassLen);
+      setPassError('New password must be at least 6 characters.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPassError(t.profile.errorPassMatch);
+      setPassError('Confirm password does not match.');
       return;
     }
 
     if (!passOtp.trim() || passOtp.trim().length !== 6) {
-      setPassError(t.profile.errorNeedOtp);
+      setPassError('Please enter the 6-digit OTP code.');
       return;
     }
 
     const rawOtp = localStorage.getItem(`vyrith_otp_${user?.email.toLowerCase().trim()}`);
     if (!rawOtp) {
-      setPassError(t.auth.otpInvalid);
+      setPassError('OTP code is invalid or expired.');
       return;
     }
 
     const { otp, expiry } = JSON.parse(rawOtp);
     if (Date.now() > expiry || otp !== passOtp.trim()) {
-      setPassError(t.auth.otpInvalid);
+      setPassError('OTP code is invalid or expired.');
       return;
     }
 
@@ -178,15 +172,14 @@ export default function ProfilePage() {
 
     if (res.success) {
       localStorage.removeItem(`vyrith_otp_${user?.email.toLowerCase().trim()}`);
-      setPassSuccess(t.profile.successPass);
+      setPassSuccess('Password changed successfully.');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setPassOtp('');
-      setOtpSent(false);
       setTimeout(() => setPassSuccess(''), 4000);
     } else {
-      setPassError(res.error || 'Đổi mật khẩu thất bại.');
+      setPassError(res.error || 'Failed to change password.');
     }
   };
 
@@ -194,8 +187,8 @@ export default function ProfilePage() {
     <ProtectedRoute>
       <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 space-y-8">
         
-        {/* Phần 1: Profile Information */}
-        <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-10 rounded-2xl space-y-8">
+        {/* Profile Info */}
+        <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-10 rounded-3xl space-y-8">
           
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 border-b border-white/[0.08] pb-6 text-center sm:text-left">
             <div className="relative group shrink-0">
@@ -213,7 +206,7 @@ export default function ProfilePage() {
                 className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-[11px] text-white"
               >
                 <Upload className="w-4 h-4" />
-                <span>{t.profile.uploadBtn}</span>
+                <span>Upload</span>
               </button>
             </div>
 
@@ -230,7 +223,7 @@ export default function ProfilePage() {
                     type="button"
                     onClick={handleCopyUid}
                     className="ml-1 text-[#94A3B8] hover:text-white transition-colors"
-                    title={t.auth.copyUid}
+                    title="Copy UID"
                   >
                     {copiedUid ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
@@ -242,11 +235,11 @@ export default function ProfilePage() {
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[10px] font-mono">
                   <Shield className="w-3 h-3" />
-                  <span>{user?.role === 'FOUNDER' ? t.profile.founderBadge : t.profile.devBadge}</span>
+                  <span>{user?.role === 'FOUNDER' ? 'Executive Founder' : 'Vyrith Certified Developer'}</span>
                 </span>
                 {user?.role === 'FOUNDER' && (
                   <span className="text-[10px] text-amber-400/90 font-mono">
-                    {t.profile.founderNote}
+                    * Your avatar syncs globally with About Us page
                   </span>
                 )}
               </div>
@@ -270,7 +263,7 @@ export default function ProfilePage() {
           <form onSubmit={handleSaveProfile} className="space-y-6">
             <div className="space-y-3">
               <label className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] block font-mono">
-                {t.profile.avatarTitle}
+                Update Profile Avatar
               </label>
               
               <input
@@ -288,7 +281,7 @@ export default function ProfilePage() {
                   className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 text-xs text-white transition-all shrink-0"
                 >
                   <Upload className="w-4 h-4 text-blue-400" />
-                  <span>{t.profile.uploadBtn}</span>
+                  <span>Upload from device</span>
                 </button>
 
                 <div className="w-full flex items-center gap-2">
@@ -296,7 +289,7 @@ export default function ProfilePage() {
                     <ImageIcon className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3" />
                     <input
                       type="url"
-                      placeholder={t.profile.urlPlaceholder}
+                      placeholder="Or paste direct image URL..."
                       value={avatarUrlInput}
                       onChange={(e) => setAvatarUrlInput(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
@@ -307,7 +300,7 @@ export default function ProfilePage() {
                     onClick={handleApplyUrl}
                     className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-white font-medium"
                   >
-                    {t.profile.useUrlBtn}
+                    Use URL
                   </button>
                 </div>
               </div>
@@ -316,7 +309,7 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] mb-2 block font-mono">
-                  {t.profile.fullName}
+                  Full Name
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5" />
@@ -332,7 +325,7 @@ export default function ProfilePage() {
 
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] mb-2 block font-mono">
-                  {t.profile.phoneLabel}
+                  Phone Number
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5" />
@@ -349,7 +342,7 @@ export default function ProfilePage() {
 
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] mb-2 block font-mono">
-                {t.profile.emailLabel}
+                Verified Email Address
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5" />
@@ -368,19 +361,19 @@ export default function ProfilePage() {
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-[0_0_20px_-3px_rgba(59,130,246,0.4)] transition-all"
               >
                 <Save className="w-4 h-4" />
-                <span>{t.profile.saveProfileBtn}</span>
+                <span>Save Profile Changes</span>
               </button>
             </div>
           </form>
         </div>
 
-        {/* Phần 2: Change Password with Email OTP */}
-        <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-10 rounded-2xl space-y-6">
+        {/* Change Password with OTP */}
+        <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-10 rounded-3xl space-y-6">
           <div className="flex items-center gap-3 border-b border-white/[0.08] pb-4">
             <KeyRound className="w-5 h-5 text-blue-400" />
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">{t.profile.passTitle}</h2>
-              <p className="text-xs text-[#94A3B8]">{t.profile.passSubtitle}</p>
+              <h2 className="text-base sm:text-lg font-bold text-white">Security Passcode (Email OTP Required)</h2>
+              <p className="text-xs text-[#94A3B8]">Two-factor verification via email is required to update your security passcode</p>
             </div>
           </div>
 
@@ -401,7 +394,7 @@ export default function ProfilePage() {
           <form onSubmit={handleChangePass} className="space-y-4">
             <div>
               <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5">
-                {t.profile.currentPass} *
+                Current Password *
               </label>
               <input
                 type="password"
@@ -416,7 +409,7 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5">
-                  {t.profile.newPass} *
+                  New Password *
                 </label>
                 <input
                   type="password"
@@ -430,7 +423,7 @@ export default function ProfilePage() {
 
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5">
-                  {t.profile.confirmNewPass} *
+                  Confirm New Password *
                 </label>
                 <input
                   type="password"
@@ -443,10 +436,10 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* OTP Section for Password Change */}
+            {/* OTP Section */}
             <div className="pt-2">
               <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5">
-                {t.profile.otpLabel} *
+                Email Verification Code (OTP) *
               </label>
               <div className="flex items-center gap-3">
                 <input
@@ -474,13 +467,10 @@ export default function ProfilePage() {
                     <Send className="w-3.5 h-3.5" />
                   )}
                   <span>
-                    {otpCountdown > 0 ? `${otpCountdown}s` : t.profile.getOtpBtn}
+                    {otpCountdown > 0 ? `${otpCountdown}s` : 'Get OTP'}
                   </span>
                 </button>
               </div>
-              <p className="text-[10px] text-[#94A3B8]/80 font-mono mt-1.5">
-                Mã xác thực sẽ được gửi trực tiếp đến: <strong className="text-white">{user?.email}</strong>
-              </p>
             </div>
 
             <div className="flex justify-end pt-2">
@@ -490,7 +480,7 @@ export default function ProfilePage() {
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-blue-500/30 bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white font-semibold text-xs transition-all disabled:opacity-50"
               >
                 <KeyRound className="w-4 h-4" />
-                <span>{submittingPass ? 'Đang xác thực...' : t.profile.changePassBtn}</span>
+                <span>{submittingPass ? 'Verifying...' : 'Verify OTP & Update Passcode'}</span>
               </button>
             </div>
           </form>

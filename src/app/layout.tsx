@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import '@/styles/globals.css';
-import { LanguageProvider } from '@/context/LanguageContext';
 import { AuthProvider } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
+import FloatingFeedbackButton from '@/components/FloatingFeedbackButton';
 
 export const metadata: Metadata = {
   title: {
@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   },
   description: 'Independent R&D hub engineering high-performance software, C++ engines, and virtual worlds.',
   icons: {
-    icon: '/icons/channel.png',
-    shortcut: '/icons/channel.png',
-    apple: '/icons/channel.png',
+    icon: '/icons/logo.svg',
+    shortcut: '/icons/logo.svg',
+    apple: '/icons/logo.svg',
   },
 };
 
@@ -35,12 +35,11 @@ export default function RootLayout({
         <div className="fixed bottom-[-10vw] right-[10vw] w-[50vw] h-[50vw] max-w-[700px] max-h-[700px] bg-[#3B82F6]/10 blur-[140px] pointer-events-none rounded-full" />
 
         <AuthProvider>
-          <LanguageProvider>
-            <Navbar />
-            <main className="relative z-10 w-full min-h-[calc(100vh-5rem)] flex flex-col justify-between">
-              {children}
-            </main>
-          </LanguageProvider>
+          <Navbar />
+          <main className="relative z-10 w-full min-h-[calc(100vh-5rem)] flex flex-col justify-between">
+            {children}
+          </main>
+          <FloatingFeedbackButton />
         </AuthProvider>
       </body>
     </html>

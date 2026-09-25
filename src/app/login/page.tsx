@@ -4,18 +4,18 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { useLanguage } from '@/context/LanguageContext';
-import { Mail, Lock, ArrowRight, Terminal, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Terminal, AlertCircle, CheckSquare, Square, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 function LoginForm() {
   const { login } = useAuth();
-  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLockActive, setCapsLockActive] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,6 +28,10 @@ function LoginForm() {
       setRememberMe(true);
     }
   }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    setCapsLockActive(e.getModifierState('CapsLock'));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,18 +49,18 @@ function LoginForm() {
       }
       router.push(redirectUrl);
     } else {
-      setError(res.error || 'Đăng nhập không thành công.');
+      setError(res.error || 'Authentication failed. Please verify your credentials.');
     }
   };
 
   return (
-    <div className="w-full max-w-[420px] border border-white/10 bg-[#121826]/80 backdrop-blur-2xl p-6 sm:p-9 rounded-2xl shadow-2xl relative">
+    <div className="w-full max-w-[420px] border border-white/10 bg-[#121826]/80 backdrop-blur-2xl p-6 sm:p-9 rounded-3xl shadow-2xl relative">
       <div className="text-center space-y-2 mb-6">
-        <div className="w-12 h-12 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center mx-auto text-blue-400 mb-3 shadow-[0_0_20px_-3px_rgba(59,130,246,0.5)]">
+        <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center mx-auto text-blue-400 mb-3 shadow-[0_0_20px_-3px_rgba(59,130,246,0.5)]">
           <Terminal className="w-6 h-6" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-extrabold text-white">{t.auth.loginTitle}</h1>
-        <p className="text-xs text-[#94A3B8]">{t.auth.loginSubtitle}</p>
+        <h1 className="text-xl sm:text-2xl font-extrabold text-white">Access Terminal</h1>
+        <p className="text-xs text-[#94A3B8]">Sign in to access your Vyrith Studio workspace</p>
       </div>
 
       {error && (
@@ -66,10 +70,17 @@ function LoginForm() {
         </div>
       )}
 
+      {capsLockActive && (
+        <div className="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 font-mono">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>CAPS LOCK is ON</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1.5 font-mono">
-            {t.auth.email}
+            Email address
           </label>
           <div className="relative">
             <Mail className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5" />
@@ -85,17 +96,26 @@ function LoginForm() {
 
         <div>
           <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1.5 font-mono">
-            {t.auth.password}
+            Password
           </label>
           <div className="relative">
             <Lock className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5" />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
+              onKeyDown={handleKeyDown}
+              onKeyUp={handleKeyDown}
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-3 text-[#94A3B8] hover:text-white"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
         </div>
 
@@ -108,7 +128,7 @@ function LoginForm() {
           ) : (
             <Square className="w-4 h-4 text-[#94A3B8]" />
           )}
-          <span>{t.auth.rememberMe}</span>
+          <span>Remember login credentials</span>
         </div>
 
         <button
@@ -116,15 +136,15 @@ function LoginForm() {
           disabled={loading}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs tracking-wider uppercase shadow-[0_0_20px_-3px_rgba(59,130,246,0.5)] transition-all mt-4 disabled:opacity-50"
         >
-          <span>{loading ? t.auth.authenticating : t.auth.signInBtn}</span>
+          <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </form>
 
       <p className="mt-6 text-center text-xs text-[#94A3B8]">
-        {t.auth.dontHaveAccount}{' '}
+        Don't have an account?{' '}
         <Link href="/signup" className="text-blue-400 hover:underline font-semibold">
-          {t.auth.signUpBtn}
+          Sign Up
         </Link>
       </p>
     </div>

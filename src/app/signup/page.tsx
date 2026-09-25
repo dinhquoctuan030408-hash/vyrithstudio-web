@@ -4,12 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { useLanguage } from '@/context/LanguageContext';
-import { Mail, Lock, User, Phone, ArrowRight, Terminal, AlertCircle, KeyRound, CheckCircle2, ArrowLeft, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Mail, Lock, User, Phone, ArrowRight, Terminal, AlertCircle, KeyRound, CheckCircle2, ArrowLeft, ShieldCheck, RefreshCw, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 export default function SignupPage() {
   const { signup, sendEmailOtp } = useAuth();
-  const { t } = useLanguage();
   const router = useRouter();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -21,6 +19,10 @@ export default function SignupPage() {
     password: '',
     confirmPassword: '',
   });
+
+  const [showPass, setShowPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [capsLockActive, setCapsLockActive] = useState(false);
 
   const [otpCode, setOtpCode] = useState('');
   const [demoOtpHint, setDemoOtpHint] = useState('');
@@ -42,23 +44,27 @@ export default function SignupPage() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    setCapsLockActive(e.getModifierState('CapsLock'));
+  };
+
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
 
     if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim() || !formData.password || !formData.confirmPassword) {
-      setError(t.profile.errorFill);
+      setError('Please fill in all required fields.');
       return;
     }
 
     if (formData.password.length < 6) {
-      setError(t.profile.errorPassLen);
+      setError('Password must be at least 6 characters.');
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError(t.profile.errorPassMatch);
+      setError('Confirm password does not match.');
       return;
     }
 
@@ -69,12 +75,12 @@ export default function SignupPage() {
     if (res.success) {
       setStep(2);
       setCountdown(60);
-      setSuccessMsg(t.auth.otpSentSuccess);
+      setSuccessMsg('6-digit verification code has been dispatched to your email.');
       if (res.otp) {
         setDemoOtpHint(res.otp);
       }
     } else {
-      setError(res.error || 'Không thể gửi mã xác thực Email.');
+      setError(res.error || 'Failed to dispatch verification OTP.');
     }
   };
 
@@ -87,7 +93,7 @@ export default function SignupPage() {
     setLoading(false);
     if (res.success) {
       setCountdown(60);
-      setSuccessMsg(t.auth.otpSentSuccess);
+      setSuccessMsg('A new verification code has been sent to your email.');
       if (res.otp) {
         setDemoOtpHint(res.otp);
       }
@@ -99,19 +105,19 @@ export default function SignupPage() {
     setError('');
 
     if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      setError(t.auth.otpRequired);
+      setError('Please enter the 6-digit verification code.');
       return;
     }
 
     const rawOtp = localStorage.getItem(`vyrith_otp_${formData.email.toLowerCase().trim()}`);
     if (!rawOtp) {
-      setError(t.auth.otpInvalid);
+      setError('Verification code is invalid or expired.');
       return;
     }
 
     const { otp, expiry } = JSON.parse(rawOtp);
     if (Date.now() > expiry || otp !== otpCode.trim()) {
-      setError(t.auth.otpInvalid);
+      setError('Verification code is invalid or expired.');
       return;
     }
 
@@ -128,21 +134,21 @@ export default function SignupPage() {
       localStorage.removeItem(`vyrith_otp_${formData.email.toLowerCase().trim()}`);
       router.push('/dashboard');
     } else {
-      setError(res.error || 'Đăng ký không thành công.');
+      setError(res.error || 'Registration failed.');
     }
   };
 
   return (
     <div className="w-full flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
-      <div className="w-full max-w-[460px] border border-white/10 bg-[#121826]/80 backdrop-blur-2xl p-6 sm:p-9 rounded-2xl shadow-2xl relative">
+      <div className="w-full max-w-[460px] border border-white/10 bg-[#121826]/80 backdrop-blur-2xl p-6 sm:p-9 rounded-3xl shadow-2xl relative">
         
         <div className="text-center space-y-2 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center mx-auto text-blue-400 mb-3 shadow-[0_0_20px_-3px_rgba(59,130,246,0.5)]">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center mx-auto text-blue-400 mb-3 shadow-[0_0_20px_-3px_rgba(59,130,246,0.5)]">
             <Terminal className="w-6 h-6" />
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-white">{t.auth.signupTitle}</h1>
+          <h1 className="text-xl sm:text-2xl font-extrabold text-white">Create Credentials</h1>
           <p className="text-xs text-[#94A3B8]">
-            {step === 1 ? t.auth.step1Title : t.auth.step2Title}
+            {step === 1 ? '1. Account Information' : '2. Email Security Verification'}
           </p>
         </div>
 
@@ -150,6 +156,13 @@ export default function SignupPage() {
           <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {capsLockActive && (
+          <div className="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 font-mono">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>CAPS LOCK is ON</span>
           </div>
         )}
 
@@ -168,7 +181,7 @@ export default function SignupPage() {
               onClick={() => setOtpCode(demoOtpHint)}
               className="text-[10px] text-blue-400 hover:underline font-bold"
             >
-              Tự điền
+              Auto Fill
             </button>
           </div>
         )}
@@ -177,7 +190,7 @@ export default function SignupPage() {
           <form onSubmit={handleStep1Submit} className="space-y-3.5">
             <div>
               <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1">
-                {t.auth.name} *
+                Full Name *
               </label>
               <div className="relative">
                 <User className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3" />
@@ -193,7 +206,7 @@ export default function SignupPage() {
 
             <div>
               <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1">
-                {t.auth.email} *
+                Email address *
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3" />
@@ -209,7 +222,7 @@ export default function SignupPage() {
 
             <div>
               <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1">
-                {t.auth.phone} *
+                Phone Number *
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3" />
@@ -226,35 +239,53 @@ export default function SignupPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1">
-                  {t.auth.password} *
+                  Password *
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#94A3B8] absolute left-3 top-3" />
                   <input
-                    type="password"
+                    type={showPass ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    onKeyDown={handleKeyDown}
+                    onKeyUp={handleKeyDown}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-2.5 top-2.5 text-[#94A3B8] hover:text-white"
+                  >
+                    {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
               </div>
 
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1">
-                  {t.auth.confirmPassword} *
+                  Confirm Password *
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#94A3B8] absolute left-3 top-3" />
                   <input
-                    type="password"
+                    type={showConfirmPass ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    onKeyDown={handleKeyDown}
+                    onKeyUp={handleKeyDown}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPass(!showConfirmPass)}
+                    className="absolute right-2.5 top-2.5 text-[#94A3B8] hover:text-white"
+                  >
+                    {showConfirmPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
               </div>
             </div>
@@ -264,20 +295,20 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs tracking-wider uppercase shadow-[0_0_20px_-3px_rgba(59,130,246,0.5)] transition-all mt-4 disabled:opacity-50"
             >
-              <span>{loading ? 'Đang gửi mã...' : t.auth.sendOtpBtn}</span>
+              <span>{loading ? 'Dispatching OTP...' : 'Send Verification OTP'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
         ) : (
           <form onSubmit={handleFinalSignup} className="space-y-4">
             <div className="p-3 rounded-xl bg-[#090D16] border border-white/10 space-y-1">
-              <span className="text-[10px] text-[#94A3B8] uppercase tracking-widest font-mono">Email nhận mã OTP</span>
+              <span className="text-[10px] text-[#94A3B8] uppercase tracking-widest font-mono">OTP Target Email</span>
               <p className="text-xs font-bold text-white font-mono truncate">{formData.email}</p>
             </div>
 
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1.5">
-                {t.auth.otpPlaceholder} *
+              <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-medium block mb-1.5 font-mono">
+                6-Digit OTP Code *
               </label>
               <div className="relative">
                 <KeyRound className="w-4 h-4 text-[#94A3B8] absolute left-3.5 top-3.5" />
@@ -300,7 +331,7 @@ export default function SignupPage() {
                 className="text-[#94A3B8] hover:text-white flex items-center gap-1 font-mono text-[11px]"
               >
                 <ArrowLeft className="w-3 h-3" />
-                <span>{t.auth.backBtn}</span>
+                <span>Back</span>
               </button>
 
               <button
@@ -312,7 +343,7 @@ export default function SignupPage() {
                 }`}
               >
                 <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-                <span>{countdown > 0 ? `${countdown}s` : t.auth.resendOtpBtn}</span>
+                <span>{countdown > 0 ? `${countdown}s` : 'Resend Code'}</span>
               </button>
             </div>
 
@@ -322,15 +353,15 @@ export default function SignupPage() {
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs tracking-wider uppercase shadow-[0_0_20px_-3px_rgba(59,130,246,0.5)] transition-all mt-3 disabled:opacity-50"
             >
               <ShieldCheck className="w-4 h-4" />
-              <span>{loading ? t.auth.creating : t.auth.verifyAndCreate}</span>
+              <span>{loading ? 'Creating Account...' : 'Verify OTP & Create Credentials'}</span>
             </button>
           </form>
         )}
 
         <p className="mt-6 text-center text-xs text-[#94A3B8]">
-          {t.auth.alreadyHaveAccount}{' '}
+          Already have an account?{' '}
           <Link href="/login" className="text-blue-400 hover:underline font-semibold">
-            {t.auth.signInBtn}
+            Sign In
           </Link>
         </p>
       </div>
