@@ -1,15 +1,15 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
+  "/appstore/page": "app/appstore/page.js",
   "/aboutus/page": "app/aboutus/page.js",
   "/api/send-otp/route": "app/api/send-otp/route.js",
-  "/appstore/page": "app/appstore/page.js",
+  "/page": "app/page.js",
   "/login/page": "app/login/page.js",
-  "/panel/page": "app/panel/page.js",
   "/dashboard/page": "app/dashboard/page.js",
+  "/panel/page": "app/panel/page.js",
+  "/project/page": "app/project/page.js",
   "/profile/page": "app/profile/page.js",
   "/project/[id]/page": "app/project/[id]/page.js",
   "/signup/page": "app/signup/page.js",
-  "/project/page": "app/project/page.js",
-  "/page": "app/page.js",
   "/icon.svg/route": "app/icon.svg/route.js"
 }

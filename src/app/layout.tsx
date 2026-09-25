@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   },
   description: 'Independent R&D hub engineering high-performance software, C++ engines, and virtual worlds.',
   icons: {
-    icon: '/icons/logo.svg',
-    shortcut: '/icons/logo.svg',
-    apple: '/icons/logo.svg',
+    icon: '/icons/channel.png',
+    shortcut: '/icons/channel.png',
+    apple: '/icons/channel.png',
   },
 };
 
