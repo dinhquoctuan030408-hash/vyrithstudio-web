@@ -3,13 +3,13 @@
   "/aboutus/page": "app/aboutus/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/api/send-otp/route": "app/api/send-otp/route.js",
-  "/login/page": "app/login/page.js",
   "/page": "app/page.js",
   "/appstore/page": "app/appstore/page.js",
-  "/profile/page": "app/profile/page.js",
-  "/panel/page": "app/panel/page.js",
+  "/login/page": "app/login/page.js",
   "/project/[id]/page": "app/project/[id]/page.js",
   "/project/page": "app/project/page.js",
-  "/signup/page": "app/signup/page.js",
-  "/icon.svg/route": "app/icon.svg/route.js"
+  "/profile/page": "app/profile/page.js",
+  "/panel/page": "app/panel/page.js",
+  "/icon.svg/route": "app/icon.svg/route.js",
+  "/signup/page": "app/signup/page.js"
 }
