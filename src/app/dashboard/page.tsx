@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import StudioIcon from '@/components/StudioIcon';
 import StatusBadge from '@/components/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
-import { getLiveProjects, getLiveApps } from '@/data/projectManager';
+import { fetchAndSyncCloudData } from '@/data/projectManager';
 import { UpcomingProject, AppItem } from '@/data/config';
 import { ArrowRight, Sparkles, Layers, ExternalLink, Download } from 'lucide-react';
 
@@ -17,8 +17,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     document.title = 'Vyrith Studio - Dashboard';
-    setActiveApps(getLiveApps());
-    setUpcomingProjects(getLiveProjects());
+    fetchAndSyncCloudData().then(data => {
+      setActiveApps(data.apps);
+      setUpcomingProjects(data.projects);
+    });
   }, []);
 
   return (

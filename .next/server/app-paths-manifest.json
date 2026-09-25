@@ -6,6 +6,7 @@
   "/api/auth/profile/route": "app/api/auth/profile/route.js",
   "/api/auth/signup/route": "app/api/auth/signup/route.js",
   "/api/send-otp/route": "app/api/send-otp/route.js",
+  "/api/studio/data/route": "app/api/studio/data/route.js",
   "/appstore/page": "app/appstore/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/icon.svg/route": "app/icon.svg/route.js",

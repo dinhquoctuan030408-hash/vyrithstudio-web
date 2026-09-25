@@ -4,7 +4,7 @@ const PROJECTS_STORAGE_KEY = 'vyrith_custom_projects';
 const APPS_STORAGE_KEY = 'vyrith_custom_apps';
 const FEEDBACK_STORAGE_KEY = 'vyrith_feedback_threads';
 
-// Projects
+// 1. PROJECTS
 export const getLiveProjects = (): UpcomingProject[] => {
   if (typeof window === 'undefined') return STUDIO_CONFIG.upcomingProjects;
   try {
@@ -21,12 +21,21 @@ export const getLiveProjectById = (id: string): UpcomingProject | undefined => {
   return getLiveProjects().find(p => p.id === id);
 };
 
-export const saveLiveProjects = (projects: UpcomingProject[]): void => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+export const saveLiveProjects = async (projects: UpcomingProject[]): Promise<void> => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+  }
+  // Đồng bộ lên Cloud Database
+  try {
+    await fetch('/api/studio/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'projects', data: projects }),
+    });
+  } catch (e) {}
 };
 
-// Apps
+// 2. APPS
 export const getLiveApps = (): AppItem[] => {
   if (typeof window === 'undefined') return STUDIO_CONFIG.activeApps;
   try {
@@ -39,12 +48,21 @@ export const getLiveApps = (): AppItem[] => {
   return STUDIO_CONFIG.activeApps;
 };
 
-export const saveLiveApps = (apps: AppItem[]): void => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(apps));
+export const saveLiveApps = async (apps: AppItem[]): Promise<void> => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(apps));
+  }
+  // Đồng bộ lên Cloud Database
+  try {
+    await fetch('/api/studio/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'apps', data: apps }),
+    });
+  } catch (e) {}
 };
 
-// Feedback Threads
+// 3. FEEDBACK THREADS
 export const getFeedbackThreads = (): FeedbackThread[] => {
   if (typeof window === 'undefined') return [];
   try {
@@ -54,12 +72,24 @@ export const getFeedbackThreads = (): FeedbackThread[] => {
   return [];
 };
 
-export const saveFeedbackThreads = (threads: FeedbackThread[]): void => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(threads));
+export const saveFeedbackThreads = async (threads: FeedbackThread[]): Promise<void> => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(threads));
+  }
+  // Đồng bộ lên Cloud Database
+  try {
+    await fetch('/api/studio/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'feedbacks', data: threads }),
+    });
+  } catch (e) {}
 };
 
-export const sendUserFeedback = (user: { id: string; name: string; email: string; avatar: string }, content: string): FeedbackMessage => {
+export const sendUserFeedback = async (
+  user: { id: string; name: string; email: string; avatar: string }, 
+  content: string
+): Promise<FeedbackMessage> => {
   const threads = getFeedbackThreads();
   let thread = threads.find(t => t.userId === user.id);
 
@@ -90,11 +120,11 @@ export const sendUserFeedback = (user: { id: string; name: string; email: string
     thread.messages.push(newMsg);
   }
 
-  saveFeedbackThreads(threads);
+  await saveFeedbackThreads(threads);
   return newMsg;
 };
 
-export const replyFeedbackMessage = (userId: string, content: string): FeedbackMessage => {
+export const replyFeedbackMessage = async (userId: string, content: string): Promise<FeedbackMessage> => {
   const threads = getFeedbackThreads();
   const thread = threads.find(t => t.userId === userId);
 
@@ -111,8 +141,34 @@ export const replyFeedbackMessage = (userId: string, content: string): FeedbackM
 
   if (thread) {
     thread.messages.push(replyMsg);
-    saveFeedbackThreads(threads);
+    await saveFeedbackThreads(threads);
   }
 
   return replyMsg;
+};
+
+// 4. GLOBAL CLOUD SYNC FETCHER (Gọi khi load trang trên bất kỳ thiết bị nào)
+export const fetchAndSyncCloudData = async (): Promise<{
+  projects: UpcomingProject[];
+  apps: AppItem[];
+  feedbacks: FeedbackThread[];
+}> => {
+  try {
+    const res = await fetch('/api/studio/data', { cache: 'no-store' });
+    const json = await res.json();
+    if (json.success) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(json.projects));
+        localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(json.apps));
+        localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(json.feedbacks));
+      }
+      return json;
+    }
+  } catch (e) {}
+
+  return {
+    projects: getLiveProjects(),
+    apps: getLiveApps(),
+    feedbacks: getFeedbackThreads(),
+  };
 };

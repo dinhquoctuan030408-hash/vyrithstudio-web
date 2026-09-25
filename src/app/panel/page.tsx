@@ -5,11 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { STUDIO_CONFIG, UpcomingProject, AppProjectStatus, ProjectAttachment, AppItem, FeedbackThread } from '@/data/config';
 import { 
-  getLiveProjects, 
+  fetchAndSyncCloudData,
   saveLiveProjects, 
-  getLiveApps, 
   saveLiveApps, 
-  getFeedbackThreads, 
   saveFeedbackThreads, 
   replyFeedbackMessage 
 } from '@/data/projectManager';
@@ -26,7 +24,6 @@ import {
   Upload, 
   Image as ImageIcon, 
   FileText, 
-  Paperclip, 
   Eye, 
   Layers, 
   Cpu, 
@@ -36,15 +33,14 @@ import {
   Tag as TagIcon,
   ToggleLeft,
   ToggleRight,
-  Download,
-  AlertCircle
+  Download
 } from 'lucide-react';
 
 export default function FounderPanelPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'projects' | 'apps' | 'feedback'>('apps');
+  const [activeTab, setActiveTab] = useState<'apps' | 'projects' | 'feedback'>('apps');
   const [successMsg, setSuccessMsg] = useState('');
 
   // Projects State
@@ -80,13 +76,15 @@ export default function FounderPanelPage() {
       router.push('/dashboard');
       return;
     }
-    setProjects(getLiveProjects());
-    setApps(getLiveApps());
-    const loadedThreads = getFeedbackThreads();
-    setThreads(loadedThreads);
-    if (loadedThreads.length > 0 && !selectedThreadUser) {
-      setSelectedThreadUser(loadedThreads[0].userId);
-    }
+
+    fetchAndSyncCloudData().then(data => {
+      setProjects(data.projects);
+      setApps(data.apps);
+      setThreads(data.feedbacks);
+      if (data.feedbacks.length > 0 && !selectedThreadUser) {
+        setSelectedThreadUser(data.feedbacks[0].userId);
+      }
+    });
   }, [isAuthenticated, isFounder, router, selectedThreadUser]);
 
   if (!isAuthenticated || !isFounder) {
@@ -182,7 +180,7 @@ export default function FounderPanelPage() {
     });
   };
 
-  const handleSaveProject = (e: React.FormEvent) => {
+  const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProj) return;
     let updated: UpcomingProject[];
@@ -192,18 +190,18 @@ export default function FounderPanelPage() {
       updated = projects.map(p => p.id === editingProj.id ? editingProj : p);
     }
     setProjects(updated);
-    saveLiveProjects(updated);
+    await saveLiveProjects(updated);
     setEditingProj(null);
     setIsCreatingProj(false);
-    setSuccessMsg('Project synchronized successfully.');
+    setSuccessMsg('Project synchronized across all cloud instances.');
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
-  const handleDeleteProj = (id: string) => {
+  const handleDeleteProj = async (id: string) => {
     if (confirm('Delete this project?')) {
       const updated = projects.filter(p => p.id !== id);
       setProjects(updated);
-      saveLiveProjects(updated);
+      await saveLiveProjects(updated);
     }
   };
 
@@ -225,7 +223,7 @@ export default function FounderPanelPage() {
     });
   };
 
-  const handleToggleAppDownloadQuick = (appId: string) => {
+  const handleToggleAppDownloadQuick = async (appId: string) => {
     const updated = apps.map(a => {
       if (a.id === appId) {
         const nextState = a.downloadEnabled === false ? true : false;
@@ -234,8 +232,8 @@ export default function FounderPanelPage() {
       return a;
     });
     setApps(updated);
-    saveLiveApps(updated);
-    setSuccessMsg('Download button status toggled.');
+    await saveLiveApps(updated);
+    setSuccessMsg('Download button status synced globally.');
     setTimeout(() => setSuccessMsg(''), 2500);
   };
 
@@ -262,7 +260,7 @@ export default function FounderPanelPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleSaveApp = (e: React.FormEvent) => {
+  const handleSaveApp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingApp) return;
     let updated: AppItem[];
@@ -272,31 +270,31 @@ export default function FounderPanelPage() {
       updated = apps.map(a => a.id === editingApp.id ? editingApp : a);
     }
     setApps(updated);
-    saveLiveApps(updated);
+    await saveLiveApps(updated);
     setEditingApp(null);
     setIsCreatingApp(false);
-    setSuccessMsg('App information, download button setting, and tags saved.');
+    setSuccessMsg('App information and download link saved globally.');
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
-  const handleDeleteApp = (id: string) => {
+  const handleDeleteApp = async (id: string) => {
     if (confirm('Delete this application entry?')) {
       const updated = apps.filter(a => a.id !== id);
       setApps(updated);
-      saveLiveApps(updated);
+      await saveLiveApps(updated);
     }
   };
 
   // ================= FEEDBACK HANDLERS =================
   const currentThread = threads.find(t => t.userId === selectedThreadUser);
 
-  const handleTogglePinThread = (userId: string) => {
+  const handleTogglePinThread = async (userId: string) => {
     const updated = threads.map(t => t.userId === userId ? { ...t, pinned: !t.pinned } : t);
     setThreads(updated);
-    saveFeedbackThreads(updated);
+    await saveFeedbackThreads(updated);
   };
 
-  const handleDeleteMessage = (userId: string, msgId: string) => {
+  const handleDeleteMessage = async (userId: string, msgId: string) => {
     const updated = threads.map(t => {
       if (t.userId === userId) {
         return { ...t, messages: t.messages.filter(m => m.id !== msgId) };
@@ -304,14 +302,15 @@ export default function FounderPanelPage() {
       return t;
     }).filter(t => t.messages.length > 0);
     setThreads(updated);
-    saveFeedbackThreads(updated);
+    await saveFeedbackThreads(updated);
   };
 
-  const handleSendFounderReply = (e: React.FormEvent) => {
+  const handleSendFounderReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim() || !selectedThreadUser) return;
-    replyFeedbackMessage(selectedThreadUser, replyText);
-    setThreads(getFeedbackThreads());
+    await replyFeedbackMessage(selectedThreadUser, replyText);
+    const data = await fetchAndSyncCloudData();
+    setThreads(data.feedbacks);
     setReplyText('');
   };
 
@@ -327,7 +326,7 @@ export default function FounderPanelPage() {
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold text-white">Founder Control Panel</h1>
           <p className="text-xs sm:text-sm text-[#94A3B8] mt-1">
-            Toggle downloads, edit apps & projects, customize tags, and chat with users.
+            Real-time Cloud Sync: Toggle downloads, edit apps & projects, customize tags, and chat with users.
           </p>
         </div>
 
@@ -406,7 +405,6 @@ export default function FounderPanelPage() {
 
                     <p className="text-xs text-[#94A3B8] line-clamp-2">{app.description}</p>
                     
-                    {/* Tags */}
                     {app.tags && app.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {app.tags.map(t => (
@@ -417,7 +415,7 @@ export default function FounderPanelPage() {
                       </div>
                     )}
 
-                    {/* Quick Download Toggle Switch Box */}
+                    {/* Quick Download Toggle Switch */}
                     <div className="p-3 rounded-2xl bg-[#090D16] border border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Download className={`w-4 h-4 ${isDownloadOn ? 'text-emerald-400' : 'text-[#94A3B8]'}`} />
@@ -656,7 +654,7 @@ export default function FounderPanelPage() {
         </div>
       )}
 
-      {/* MODAL EDIT / CREATE APP (WITH TOGGLE DOWNLOAD BUTTON) */}
+      {/* MODAL EDIT / CREATE APP */}
       {editingApp && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-xl border border-white/15 bg-[#121826] rounded-3xl p-6 sm:p-8 space-y-6 my-8">
@@ -697,7 +695,6 @@ export default function FounderPanelPage() {
                 </div>
               </div>
 
-              {/* Status & Version */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
@@ -728,7 +725,7 @@ export default function FounderPanelPage() {
                 </div>
               </div>
 
-              {/* DOWNLOAD BUTTON TOGGLE SWITCH IN FORM */}
+              {/* Download Toggle in Form */}
               <div className="p-4 rounded-2xl bg-[#090D16] border border-blue-500/20 shadow-glow flex items-center justify-between">
                 <div>
                   <label className="text-xs font-bold text-white block">Download Button Status</label>

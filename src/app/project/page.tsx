@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import StudioIcon from '@/components/StudioIcon';
 import StatusBadge from '@/components/StatusBadge';
-import { getLiveProjects } from '@/data/projectManager';
+import { fetchAndSyncCloudData } from '@/data/projectManager';
 import { UpcomingProject } from '@/data/config';
 import { ExternalLink, Sparkles } from 'lucide-react';
 
@@ -13,13 +13,11 @@ export default function ProjectPage() {
 
   useEffect(() => {
     document.title = 'Vyrith Studio - Projects';
-    setProjects(getLiveProjects());
+    fetchAndSyncCloudData().then(data => setProjects(data.projects));
   }, []);
 
   return (
     <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 space-y-10 sm:space-y-12">
-      
-      {/* Title Header */}
       <div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 text-xs font-mono uppercase mb-3 shadow-[0_0_15px_-3px_rgba(99,102,241,0.3)]">
           <Sparkles className="w-3.5 h-3.5" />
@@ -31,14 +29,12 @@ export default function ProjectPage() {
         </p>
       </div>
 
-      {/* Grid Project Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
         {projects.map((proj) => (
           <div
             key={proj.id}
             className="group rounded-3xl border border-white/10 bg-[#121826]/75 backdrop-blur-2xl p-6 sm:p-7 flex flex-col justify-between space-y-6 hover:border-indigo-500/40 hover:shadow-[0_0_35px_-5px_rgba(99,102,241,0.25)] transition-all duration-300"
           >
-            {/* Top Info */}
             <div className="space-y-5">
               <div className="flex justify-between items-start gap-3">
                 <div className="flex items-center gap-3">
@@ -63,13 +59,11 @@ export default function ProjectPage() {
                 </p>
               </div>
 
-              {/* Tech Architecture & Custom Tags */}
               <div className="pt-2 border-t border-white/[0.08] space-y-2">
                 <span className="text-[10px] uppercase font-mono tracking-wider text-[#94A3B8] block">
                   Tech Architecture & Tags
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {/* Tech stack */}
                   {proj.techStack.map((tech) => (
                     <span
                       key={tech}
@@ -78,11 +72,10 @@ export default function ProjectPage() {
                       {tech}
                     </span>
                   ))}
-                  {/* Tags */}
                   {proj.tags && proj.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[11px] font-mono text-blue-400"
+                      className="px-2.5 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[11px] font-mono text-blue-400"
                     >
                       {tag}
                     </span>
@@ -91,7 +84,6 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            {/* Action Link Button */}
             <div className="pt-2">
               <Link
                 href={`/project/${proj.id}`}

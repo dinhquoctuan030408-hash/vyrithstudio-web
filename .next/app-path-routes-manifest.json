@@ -6,6 +6,7 @@
   "/api/auth/profile/route": "/api/auth/profile",
   "/api/auth/signup/route": "/api/auth/signup",
   "/api/send-otp/route": "/api/send-otp",
+  "/api/studio/data/route": "/api/studio/data",
   "/appstore/page": "/appstore",
   "/dashboard/page": "/dashboard",
   "/icon.svg/route": "/icon.svg",

@@ -81,6 +81,12 @@
       "namedRegex": "^/api/send\\-otp(?:/)?$"
     },
     {
+      "page": "/api/studio/data",
+      "regex": "^/api/studio/data(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/studio/data(?:/)?$"
+    },
+    {
       "page": "/appstore",
       "regex": "^/appstore(?:/)?$",
       "routeKeys": {},

@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import StudioIcon from '@/components/StudioIcon';
 import StatusBadge from '@/components/StatusBadge';
 import { useAuth } from '@/context/AuthContext';
-import { getLiveApps } from '@/data/projectManager';
+import { fetchAndSyncCloudData } from '@/data/projectManager';
 import { AppItem } from '@/data/config';
-import { Download, ShieldCheck, Lock, Star, Wrench, Ban } from 'lucide-react';
+import { Download, ShieldCheck, Lock, Ban, Wrench } from 'lucide-react';
 
 export default function AppStorePage() {
   const { isAuthenticated } = useAuth();
@@ -16,7 +16,7 @@ export default function AppStorePage() {
 
   useEffect(() => {
     document.title = 'Vyrith Studio - App Store';
-    setApps(getLiveApps());
+    fetchAndSyncCloudData().then(data => setApps(data.apps));
   }, []);
 
   const handleDownload = (app: AppItem) => {
@@ -50,8 +50,6 @@ export default function AppStorePage() {
 
   return (
     <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 space-y-10 sm:space-y-12">
-      
-      {/* Title Header */}
       <div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-mono uppercase mb-3 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]">
           <ShieldCheck className="w-3.5 h-3.5" />
@@ -63,12 +61,10 @@ export default function AppStorePage() {
         </p>
       </div>
 
-      {/* Grid Cards Template */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
         {apps.map((app) => {
           const isMaintenance = app.status === 'Maintenance';
           const isDiscontinued = app.status === 'Discontinued';
-          const isDev = app.status === 'In Development';
           const isDisabled = isMaintenance || isDiscontinued || app.downloadEnabled === false;
 
           return (
@@ -76,7 +72,6 @@ export default function AppStorePage() {
               key={app.id}
               className="relative group rounded-3xl border border-white/10 bg-[#121826]/75 backdrop-blur-2xl p-6 sm:p-7 flex flex-col justify-between space-y-6 hover:border-blue-500/40 hover:shadow-[0_0_35px_-5px_rgba(59,130,246,0.25)] transition-all duration-300"
             >
-              {/* Top Card Info */}
               <div className="space-y-5">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex items-center gap-3.5">
@@ -99,7 +94,6 @@ export default function AppStorePage() {
                   {app.description}
                 </p>
 
-                {/* Custom Tags */}
                 {app.tags && app.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {app.tags.map((tag) => (
@@ -114,7 +108,6 @@ export default function AppStorePage() {
                 )}
               </div>
 
-              {/* Action Button */}
               <div className="pt-2">
                 <button
                   onClick={() => handleDownload(app)}
