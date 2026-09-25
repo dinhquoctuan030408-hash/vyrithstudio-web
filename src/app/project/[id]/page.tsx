@@ -7,7 +7,7 @@ import StudioIcon from '@/components/StudioIcon';
 import StatusBadge from '@/components/StatusBadge';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { useAuth } from '@/context/AuthContext';
-import { getLiveProjectById } from '@/data/projectManager';
+import { fetchProjectById } from '@/data/projectManager';
 import { UpcomingProject, ProjectAttachment } from '@/data/config';
 import { ArrowLeft, Download, FileText, Lock, Sparkles, Image as ImageIcon, Eye } from 'lucide-react';
 
@@ -18,17 +18,35 @@ export default function ProjectDetailPage() {
 
   const projectId = (params?.id as string) || '';
   const [project, setProject] = useState<UpcomingProject | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     if (projectId) {
-      const data = getLiveProjectById(projectId);
-      if (data) {
-        setProject(data);
-        document.title = `Vyrith Studio - ${data.name}`;
-      }
+      setLoading(true);
+      fetchProjectById(projectId).then((data) => {
+        if (!isMounted) return;
+        if (data) {
+          setProject(data);
+          document.title = `Vyrith Studio - ${data.name}`;
+        }
+        setLoading(false);
+      });
     }
+    return () => {
+      isMounted = false;
+    };
   }, [projectId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-3">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs text-[#94A3B8] font-mono">Loading Project Details...</span>
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -153,7 +171,7 @@ export default function ProjectDetailPage() {
         </p>
       </div>
 
-      {/* Specifications & Documentation With Full Markdown & Math Parser */}
+      {/* Specifications & Documentation with Markdown & Math Renderer */}
       {project.detailedDocs && (
         <div className="border border-white/10 bg-[#121826]/70 backdrop-blur-xl p-6 sm:p-8 rounded-2xl space-y-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">

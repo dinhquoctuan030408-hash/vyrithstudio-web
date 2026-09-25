@@ -17,9 +17,20 @@ export const getLiveProjects = (): UpcomingProject[] => {
   return STUDIO_CONFIG.upcomingProjects;
 };
 
+// Tìm kiếm project đồng bộ
 export const getLiveProjectById = (id: string): UpcomingProject | undefined => {
   const projects = getLiveProjects();
   return projects.find(p => p.id === id);
+};
+
+// Tìm kiếm project có fetch dữ liệu mới nhất từ Cloud nếu chưa thấy trong cache
+export const fetchProjectById = async (id: string): Promise<UpcomingProject | undefined> => {
+  let project = getLiveProjectById(id);
+  if (project) return project;
+
+  // Nếu không thấy trong localStorage, gọi Cloud Data để đồng bộ
+  const syncedData = await fetchAndSyncCloudData();
+  return syncedData.projects.find(p => p.id === id);
 };
 
 export const saveLiveProjects = async (projects: UpcomingProject[]): Promise<void> => {
@@ -145,7 +156,7 @@ export const replyFeedbackMessage = async (userId: string, content: string): Pro
   return replyMsg;
 };
 
-// 4. FETCH VÀ ĐỒNG BỘ THÔNG MINH (Chỉ cập nhật khi Cloud có dữ liệu thực)
+// 4. GLOBAL CLOUD SYNC FETCHER
 export const fetchAndSyncCloudData = async (): Promise<{
   projects: UpcomingProject[];
   apps: AppItem[];
