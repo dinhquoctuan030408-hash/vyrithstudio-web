@@ -4,7 +4,6 @@ const PROJECTS_STORAGE_KEY = 'vyrith_custom_projects';
 const APPS_STORAGE_KEY = 'vyrith_custom_apps';
 const FEEDBACK_STORAGE_KEY = 'vyrith_feedback_threads';
 
-// 1. PROJECTS
 export const getLiveProjects = (): UpcomingProject[] => {
   if (typeof window === 'undefined') return STUDIO_CONFIG.upcomingProjects;
   try {
@@ -13,40 +12,56 @@ export const getLiveProjects = (): UpcomingProject[] => {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('Error reading projects from cache', e);
+  }
   return STUDIO_CONFIG.upcomingProjects;
 };
 
-// Tìm kiếm project đồng bộ
 export const getLiveProjectById = (id: string): UpcomingProject | undefined => {
-  const projects = getLiveProjects();
-  return projects.find(p => p.id === id);
+  const list = getLiveProjects();
+  return list.find(p => p.id === id);
 };
 
-// Tìm kiếm project có fetch dữ liệu mới nhất từ Cloud nếu chưa thấy trong cache
 export const fetchProjectById = async (id: string): Promise<UpcomingProject | undefined> => {
-  let project = getLiveProjectById(id);
-  if (project) return project;
+  const localMatch = getLiveProjectById(id);
+  if (localMatch) return localMatch;
 
-  // Nếu không thấy trong localStorage, gọi Cloud Data để đồng bộ
-  const syncedData = await fetchAndSyncCloudData();
-  return syncedData.projects.find(p => p.id === id);
+  const cloudData = await fetchAndSyncCloudData();
+  return cloudData.projects.find(p => p.id === id);
 };
 
-export const saveLiveProjects = async (projects: UpcomingProject[]): Promise<void> => {
+export const saveLiveProjects = async (projects: UpcomingProject[]): Promise<boolean> => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+    try {
+      localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+    } catch (err) {
+      console.warn('LocalStorage full, attempting sanitized save without excessive base64', err);
+      try {
+        const lightweight = projects.map(p => ({
+          ...p,
+          // Giới hạn dung lượng cache fallback nếu bộ nhớ trình duyệt đầy
+          galleryImages: p.galleryImages?.slice(0, 4) || [],
+          attachments: p.attachments?.slice(0, 5) || []
+        }));
+        localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(lightweight));
+      } catch (e) {}
+    }
   }
+
   try {
-    await fetch('/api/studio/data', {
+    const res = await fetch('/api/studio/data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'projects', data: projects }),
     });
-  } catch (e) {}
+    return res.ok;
+  } catch (e) {
+    return false;
+  }
 };
 
-// 2. APPS
+// APPS
 export const getLiveApps = (): AppItem[] => {
   if (typeof window === 'undefined') return STUDIO_CONFIG.activeApps;
   try {
@@ -61,7 +76,9 @@ export const getLiveApps = (): AppItem[] => {
 
 export const saveLiveApps = async (apps: AppItem[]): Promise<void> => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(apps));
+    try {
+      localStorage.setItem(APPS_STORAGE_KEY, JSON.stringify(apps));
+    } catch (e) {}
   }
   try {
     await fetch('/api/studio/data', {
@@ -72,7 +89,7 @@ export const saveLiveApps = async (apps: AppItem[]): Promise<void> => {
   } catch (e) {}
 };
 
-// 3. FEEDBACK THREADS
+// FEEDBACK
 export const getFeedbackThreads = (): FeedbackThread[] => {
   if (typeof window === 'undefined') return [];
   try {
@@ -156,7 +173,7 @@ export const replyFeedbackMessage = async (userId: string, content: string): Pro
   return replyMsg;
 };
 
-// 4. GLOBAL CLOUD SYNC FETCHER
+// GLOBAL SYNC
 export const fetchAndSyncCloudData = async (): Promise<{
   projects: UpcomingProject[];
   apps: AppItem[];

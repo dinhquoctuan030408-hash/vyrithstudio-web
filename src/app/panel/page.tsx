@@ -13,6 +13,7 @@ import {
 } from '@/data/projectManager';
 import StudioIcon from '@/components/StudioIcon';
 import StatusBadge from '@/components/StatusBadge';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { 
   LayoutDashboard, 
   Plus, 
@@ -24,6 +25,7 @@ import {
   Upload, 
   Image as ImageIcon, 
   FileText, 
+  Paperclip, 
   Eye, 
   Layers, 
   Cpu, 
@@ -33,21 +35,31 @@ import {
   Tag as TagIcon,
   ToggleLeft,
   ToggleRight,
-  Download
+  Download,
+  Info,
+  Code2,
+  FolderKanban,
+  Check
 } from 'lucide-react';
 
 export default function FounderPanelPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'apps' | 'projects' | 'feedback'>('apps');
+  const [activeTab, setActiveTab] = useState<'projects' | 'apps' | 'feedback'>('projects');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Modal Editor Sub-tabs
+  const [editorSubTab, setEditorSubTab] = useState<'general' | 'docs' | 'media' | 'tags'>('general');
 
   // Projects State
   const [projects, setProjects] = useState<UpcomingProject[]>([]);
   const [editingProj, setEditingProj] = useState<UpcomingProject | null>(null);
   const [isCreatingProj, setIsCreatingProj] = useState(false);
   const [projTagInput, setProjTagInput] = useState('');
+  const [techStackInput, setTechStackInput] = useState('');
+  
   const iconInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +116,9 @@ export default function FounderPanelPage() {
   // ================= PROJECTS HANDLERS =================
   const handleOpenCreateProj = () => {
     setIsCreatingProj(true);
+    setEditorSubTab('general');
+    setProjTagInput('');
+    setTechStackInput('Luau');
     setEditingProj({
       id: 'proj-' + Date.now().toString(36),
       name: '',
@@ -115,9 +130,23 @@ export default function FounderPanelPage() {
       tags: ['Experience'],
       projectUrl: '',
       overview: '',
-      detailedDocs: '',
+      detailedDocs: '## Architecture Specifications\n- Modular OOP state architecture.\n- Custom low-latency UDP replication.\n\n### Milestones\n- [x] Phase 1 Core Alpha\n- [ ] Phase 2 Production Loop\n\n```luau\nprint("Vyrith Studio Systems Online")\n```\n\n$$E = mc^2 \\quad \\sum_{i=1}^n x_i$$',
       galleryImages: [],
       attachments: []
+    });
+  };
+
+  const handleOpenEditProj = (proj: UpcomingProject) => {
+    setIsCreatingProj(false);
+    setEditorSubTab('general');
+    setProjTagInput('');
+    setTechStackInput(proj.techStack?.join(', ') || 'Luau');
+    setEditingProj({
+      ...proj,
+      tags: proj.tags || [],
+      techStack: proj.techStack || ['Luau'],
+      galleryImages: proj.galleryImages || [],
+      attachments: proj.attachments || []
     });
   };
 
@@ -184,31 +213,56 @@ export default function FounderPanelPage() {
     e.preventDefault();
     if (!editingProj) return;
 
-    let updated: UpcomingProject[];
+    setIsSaving(true);
+
+    const parsedTech = techStackInput
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    const targetId = editingProj.id || ('proj-' + Date.now().toString(36));
+
+    const finalProject: UpcomingProject = {
+      ...editingProj,
+      id: targetId,
+      name: editingProj.name.trim() || 'Untitled Project',
+      tagline: editingProj.tagline.trim() || 'Studio Experience',
+      status: editingProj.status || 'In Development',
+      progress: Math.min(100, Math.max(0, Number(editingProj.progress) || 0)),
+      icon: editingProj.icon || '/icons/prj1.png',
+      techStack: parsedTech.length > 0 ? parsedTech : ['Luau'],
+      tags: editingProj.tags || [],
+      overview: editingProj.overview || '',
+      detailedDocs: editingProj.detailedDocs || '',
+      galleryImages: editingProj.galleryImages || [],
+      attachments: editingProj.attachments || [],
+      projectUrl: `/project/${targetId}`
+    };
+
+    let updatedList: UpcomingProject[];
     if (isCreatingProj) {
-      const newProj = {
-        ...editingProj,
-        id: editingProj.id || ('proj-' + Date.now().toString(36)),
-        projectUrl: `/project/${editingProj.id || ('proj-' + Date.now().toString(36))}`
-      };
-      updated = [...projects, newProj];
+      updatedList = [finalProject, ...projects.filter(p => p.id !== targetId)];
     } else {
-      updated = projects.map(p => p.id === editingProj.id ? editingProj : p);
+      updatedList = projects.map(p => p.id === targetId ? finalProject : p);
     }
 
-    setProjects(updated);
-    await saveLiveProjects(updated);
+    setProjects(updatedList);
+    await saveLiveProjects(updatedList);
+    
+    setIsSaving(false);
     setEditingProj(null);
     setIsCreatingProj(false);
-    setSuccessMsg('Project saved and markdown synchronized successfully.');
-    setTimeout(() => setSuccessMsg(''), 3000);
+    setSuccessMsg(`Project "${finalProject.name}" saved and synchronized successfully.`);
+    setTimeout(() => setSuccessMsg(''), 4000);
   };
 
   const handleDeleteProj = async (id: string) => {
-    if (confirm('Delete this project?')) {
+    if (confirm('Delete this project permanently?')) {
       const updated = projects.filter(p => p.id !== id);
       setProjects(updated);
       await saveLiveProjects(updated);
+      setSuccessMsg('Project removed successfully.');
+      setTimeout(() => setSuccessMsg(''), 3000);
     }
   };
 
@@ -233,8 +287,7 @@ export default function FounderPanelPage() {
   const handleToggleAppDownloadQuick = async (appId: string) => {
     const updated = apps.map(a => {
       if (a.id === appId) {
-        const nextState = a.downloadEnabled === false ? true : false;
-        return { ...a, downloadEnabled: nextState };
+        return { ...a, downloadEnabled: a.downloadEnabled === false ? true : false };
       }
       return a;
     });
@@ -280,7 +333,7 @@ export default function FounderPanelPage() {
     await saveLiveApps(updated);
     setEditingApp(null);
     setIsCreatingApp(false);
-    setSuccessMsg('App information and download link saved globally.');
+    setSuccessMsg('App updated successfully.');
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
@@ -333,24 +386,15 @@ export default function FounderPanelPage() {
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold text-white">Founder Control Panel</h1>
           <p className="text-xs sm:text-sm text-[#94A3B8] mt-1">
-            Real-time Cloud Sync: Toggle downloads, edit apps & projects, customize tags, and chat with users.
+            Real-time Studio Configuration: Projects, Documentation Markdown, Apps & Feedback Messenger.
           </p>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#121826] border border-white/10 shrink-0">
-          <button
-            onClick={() => setActiveTab('apps')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold font-mono transition-all ${
-              activeTab === 'apps' ? 'bg-blue-600 text-white shadow-glow' : 'text-[#94A3B8] hover:text-white'
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            <span>Apps ({apps.length})</span>
-          </button>
+        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-[#121826] border border-white/10 shrink-0">
           <button
             onClick={() => setActiveTab('projects')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold font-mono transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold font-mono transition-all ${
               activeTab === 'projects' ? 'bg-blue-600 text-white shadow-glow' : 'text-[#94A3B8] hover:text-white'
             }`}
           >
@@ -358,8 +402,17 @@ export default function FounderPanelPage() {
             <span>Projects ({projects.length})</span>
           </button>
           <button
+            onClick={() => setActiveTab('apps')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold font-mono transition-all ${
+              activeTab === 'apps' ? 'bg-blue-600 text-white shadow-glow' : 'text-[#94A3B8] hover:text-white'
+            }`}
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            <span>Apps ({apps.length})</span>
+          </button>
+          <button
             onClick={() => setActiveTab('feedback')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold font-mono transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold font-mono transition-all ${
               activeTab === 'feedback' ? 'bg-blue-600 text-white shadow-glow' : 'text-[#94A3B8] hover:text-white'
             }`}
           >
@@ -370,20 +423,94 @@ export default function FounderPanelPage() {
       </div>
 
       {successMsg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 shadow-glow">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
-      {/* TAB 1: APPS MANAGEMENT */}
+      {/* TAB 1: PROJECTS */}
+      {activeTab === 'projects' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold text-white">Active Research & Game Projects</h2>
+            <button
+              onClick={handleOpenCreateProj}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-glow"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create New Project</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {projects.map((proj) => (
+              <div key={proj.id} className="border border-white/10 bg-[#121826]/80 p-5 rounded-3xl flex flex-col justify-between space-y-4 hover:border-blue-500/30 transition-all">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#090D16] border border-white/10 p-1 flex items-center justify-center">
+                        <StudioIcon src={proj.icon} alt={proj.name} fallbackType="sparkles" />
+                      </div>
+                      <StatusBadge status={proj.status} size="sm" />
+                    </div>
+                    <span className="text-xs font-mono text-blue-400 font-bold">{proj.progress}%</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-white">{proj.name}</h3>
+                    <p className="text-xs text-[#94A3B8] font-mono mt-0.5">{proj.tagline}</p>
+                    <p className="text-xs text-[#94A3B8] line-clamp-2 mt-1 leading-relaxed">{proj.overview || proj.tagline}</p>
+                  </div>
+
+                  {proj.tags && proj.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {proj.tags.map(t => (
+                        <span key={t} className="px-2 py-0.5 rounded-md bg-[#182234] border border-white/10 text-[10px] font-mono text-blue-300">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => handleOpenEditProj(proj)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 text-xs font-medium transition-all"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    <span>Open Editor</span>
+                  </button>
+                  <button
+                    onClick={() => router.push(`/project/${proj.id}`)}
+                    className="p-2 rounded-xl border border-white/10 text-[#94A3B8] hover:text-white hover:bg-white/5"
+                    title="View project page"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteProj(proj.id)}
+                    className="p-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10"
+                    title="Delete project"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: APPS MANAGEMENT */}
       {activeTab === 'apps' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-bold text-white">Studio Released Software & Plugins</h2>
             <button
               onClick={handleOpenCreateApp}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-glow"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-glow"
             >
               <Plus className="w-4 h-4" />
               <span>Add New App</span>
@@ -438,7 +565,6 @@ export default function FounderPanelPage() {
                         type="button"
                         onClick={() => handleToggleAppDownloadQuick(app.id)}
                         className="p-1 hover:scale-105 active:scale-95 transition-transform"
-                        title="Click to toggle download button"
                       >
                         {isDownloadOn ? (
                           <ToggleRight className="w-7 h-7 text-emerald-400" />
@@ -451,16 +577,15 @@ export default function FounderPanelPage() {
 
                   <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between gap-2">
                     <button
-                      onClick={() => { setIsCreatingApp(false); setEditingApp({ ...app, downloadEnabled: app.downloadEnabled !== false }); }}
+                      onClick={() => { setIsCreatingApp(false); setEditingApp({ ...app }); }}
                       className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 text-xs font-medium transition-all"
                     >
                       <Edit className="w-3.5 h-3.5" />
-                      <span>Edit Info & Status</span>
+                      <span>Edit App & Link</span>
                     </button>
                     <button
                       onClick={() => handleDeleteApp(app.id)}
                       className="p-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10"
-                      title="Delete app"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -468,75 +593,6 @@ export default function FounderPanelPage() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: PROJECTS */}
-      {activeTab === 'projects' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-bold text-white">Active Research & Game Projects</h2>
-            <button
-              onClick={handleOpenCreateProj}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-glow"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create New Project</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {projects.map((proj) => (
-              <div key={proj.id} className="border border-white/10 bg-[#121826]/80 p-5 rounded-3xl flex flex-col justify-between space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-[#090D16] border border-white/10 p-1 flex items-center justify-center">
-                        <StudioIcon src={proj.icon} alt={proj.name} fallbackType="sparkles" />
-                      </div>
-                      <StatusBadge status={proj.status} size="sm" />
-                    </div>
-                    <span className="text-xs font-mono text-blue-400 font-bold">{proj.progress}%</span>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white">{proj.name}</h3>
-                    <p className="text-xs text-[#94A3B8] line-clamp-2">{proj.tagline}</p>
-                  </div>
-                  {proj.tags && proj.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {proj.tags.map(t => (
-                        <span key={t} className="px-2 py-0.5 rounded-md bg-[#182234] border border-white/10 text-[10px] font-mono text-blue-300">
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => { setIsCreatingProj(false); setEditingProj({ ...proj }); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 text-xs font-medium transition-all"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                    <span>Edit / Tags / Files</span>
-                  </button>
-                  <button
-                    onClick={() => router.push(`/project/${proj.id}`)}
-                    className="p-2 rounded-xl border border-white/10 text-[#94A3B8] hover:text-white hover:bg-white/5"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteProj(proj.id)}
-                    className="p-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}
@@ -576,7 +632,6 @@ export default function FounderPanelPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); handleTogglePinThread(t.userId); }}
                         className="text-[#94A3B8] hover:text-amber-400 p-1"
-                        title="Pin thread"
                       >
                         <Pin className={`w-3.5 h-3.5 ${t.pinned ? 'text-amber-400 fill-amber-400' : ''}`} />
                       </button>
@@ -615,7 +670,6 @@ export default function FounderPanelPage() {
                           <button
                             onClick={() => handleDeleteMessage(currentThread.userId, m.id)}
                             className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
-                            title="Delete message"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -661,6 +715,407 @@ export default function FounderPanelPage() {
         </div>
       )}
 
+      {/* ================= STUDIO ADVANCED PROJECT EDITOR MODAL ================= */}
+      {editingProj && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="w-full max-w-5xl border border-white/15 bg-[#0e1422] rounded-3xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden">
+            
+            {/* Modal Top Header */}
+            <div className="px-6 py-4 border-b border-white/10 bg-[#121826] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                  <FolderKanban className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    {isCreatingProj ? 'Studio Creator: New Project' : `Studio Editor: ${editingProj.name || 'Untitled'}`}
+                  </h2>
+                  <span className="text-[10px] font-mono text-[#94A3B8]">ID: {editingProj.id}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingProj(null)}
+                  className="p-2 text-[#94A3B8] hover:text-white rounded-xl hover:bg-white/5 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body with Left Tabs & Right Form */}
+            <form onSubmit={handleSaveProject} className="flex-1 flex flex-col md:flex-row overflow-hidden">
+              
+              {/* Left Sub-navigation Tabs */}
+              <div className="w-full md:w-56 p-3 border-b md:border-b-0 md:border-r border-white/10 bg-[#090D16]/60 flex md:flex-col gap-1 shrink-0 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setEditorSubTab('general')}
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-mono font-semibold transition-all w-full text-left ${
+                    editorSubTab === 'general' ? 'bg-blue-600 text-white shadow-glow' : 'text-[#94A3B8] hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Info className="w-4 h-4 shrink-0" />
+                  <span>1. General & Status</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorSubTab('tags')}
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-mono font-semibold transition-all w-full text-left ${
+                    editorSubTab === 'tags' ? 'bg-blue-600 text-white shadow-glow' : 'text-[#94A3B8] hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <TagIcon className="w-4 h-4 shrink-0" />
+                  <span>2. Tech & Tags</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorSubTab('docs')}
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-mono font-semibold transition-all w-full text-left ${
+                    editorSubTab === 'docs' ? 'bg-blue-600 text-white shadow-glow' : 'text-[#94A3B8] hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Code2 className="w-4 h-4 shrink-0" />
+                  <span>3. Markdown Docs</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorSubTab('media')}
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-mono font-semibold transition-all w-full text-left ${
+                    editorSubTab === 'media' ? 'bg-blue-600 text-white shadow-glow' : 'text-[#94A3B8] hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <ImageIcon className="w-4 h-4 shrink-0" />
+                  <span>4. Media & Files</span>
+                </button>
+              </div>
+
+              {/* Right Tab Content Panel */}
+              <div className="flex-1 p-5 sm:p-7 overflow-y-auto space-y-5 bg-[#0e1422]">
+                
+                {/* SUBTAB 1: GENERAL INFO */}
+                {editorSubTab === 'general' && (
+                  <div className="space-y-4 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5 font-bold">
+                          Project Title / Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editingProj.name}
+                          onChange={(e) => setEditingProj({ ...editingProj, name: e.target.value })}
+                          placeholder="e.g. Vyrith Student, Anime Ascension..."
+                          className="w-full px-4 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5 font-bold">
+                          Tagline / Experience *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editingProj.tagline}
+                          onChange={(e) => setEditingProj({ ...editingProj, tagline: e.target.value })}
+                          placeholder="e.g. Roblox Experience, System Software..."
+                          className="w-full px-4 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5 font-bold">
+                          Project Status *
+                        </label>
+                        <select
+                          value={editingProj.status}
+                          onChange={(e) => setEditingProj({ ...editingProj, status: e.target.value as AppProjectStatus })}
+                          className="w-full px-4 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+                        >
+                          <option value="Ready">Ready</option>
+                          <option value="In Development">In Development</option>
+                          <option value="Maintenance">Maintenance</option>
+                          <option value="Discontinued">Discontinued</option>
+                          <option value="Alpha">Alpha</option>
+                          <option value="Beta">Beta</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block font-bold">
+                            Completion Progress
+                          </label>
+                          <span className="text-xs font-mono text-blue-400 font-bold">{editingProj.progress}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={editingProj.progress}
+                          onChange={(e) => setEditingProj({ ...editingProj, progress: Number(e.target.value) })}
+                          className="w-full mt-2 accent-blue-500 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5 font-bold">
+                        Project Overview (Summary)
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={editingProj.overview || ''}
+                        onChange={(e) => setEditingProj({ ...editingProj, overview: e.target.value })}
+                        placeholder="Provide a comprehensive summary of this research or game project..."
+                        className="w-full px-4 py-3 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 leading-relaxed"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* SUBTAB 2: TECH & TAGS */}
+                {editorSubTab === 'tags' && (
+                  <div className="space-y-5 animate-in fade-in duration-150">
+                    <div>
+                      <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1.5 font-bold">
+                        Tech Architecture & Frameworks (Comma separated)
+                      </label>
+                      <input
+                        type="text"
+                        value={techStackInput}
+                        onChange={(e) => setTechStackInput(e.target.value)}
+                        placeholder="Luau, C++, Unity, ECS, AI..."
+                        className="w-full px-4 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+                      />
+                      <p className="text-[10px] text-[#94A3B8] mt-1 font-mono">Example: Luau, C++, Vulkan, React</p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 space-y-3">
+                      <label className="text-xs font-bold text-white block">
+                        Custom Badges & Tags
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={projTagInput}
+                          onChange={(e) => setProjTagInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddProjTag(); } }}
+                          placeholder="Type tag (e.g. Open Source, RPG, Multiplayer) and press Add..."
+                          className="flex-1 px-4 py-2 rounded-xl bg-[#121826] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddProjTag}
+                          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow"
+                        >
+                          Add Tag
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {editingProj.tags && editingProj.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#182234] border border-white/10 text-xs font-mono text-blue-300"
+                          >
+                            <span>{tag}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveProjTag(tag)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SUBTAB 3: MARKDOWN & MATH SPECS */}
+                {editorSubTab === 'docs' && (
+                  <div className="space-y-4 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block font-bold">
+                          Documentation & Technical Specifications
+                        </label>
+                        <p className="text-[10px] text-[#94A3B8] font-mono">
+                          Supports Markdown headers (#, ##), Bold (**text**), Code blocks (```), and Math Formulas (
+..
+).
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Editor Input */}
+                      <div>
+                        <span className="text-[10px] uppercase font-mono tracking-wider text-blue-400 block mb-1">Raw Markdown Source</span>
+                        <textarea
+                          rows={13}
+                          value={editingProj.detailedDocs || ''}
+                          onChange={(e) => setEditingProj({ ...editingProj, detailedDocs: e.target.value })}
+                          placeholder="## System Architecture&#10;- Feature 1&#10;- [x] Milestone Complete&#10;&#10;```luau&#10;print('Hello')&#10;```&#10;&#10;
+E=mc 
+2
+ 
+"
+                          className="w-full h-[320px] p-3.5 rounded-2xl bg-[#090D16] border border-white/10 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-blue-500 resize-none scrollbar-thin"
+                        />
+                      </div>
+
+                      {/* Live Preview */}
+                      <div>
+                        <span className="text-[10px] uppercase font-mono tracking-wider text-emerald-400 block mb-1">Live Render Preview</span>
+                        <div className="w-full h-[320px] p-4 rounded-2xl bg-[#090D16]/70 border border-white/10 overflow-y-auto scrollbar-thin shadow-inner">
+                          {editingProj.detailedDocs ? (
+                            <MarkdownRenderer content={editingProj.detailedDocs} />
+                          ) : (
+                            <p className="text-xs text-[#94A3B8] italic">Type markdown on the left to see live preview here.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SUBTAB 4: MEDIA & ATTACHMENTS */}
+                {editorSubTab === 'media' && (
+                  <div className="space-y-5 animate-in fade-in duration-150">
+                    {/* Icon */}
+                    <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 flex items-center justify-between gap-4">
+                      <input ref={iconInputRef} type="file" accept="image/*" onChange={handleUploadProjIcon} className="hidden" />
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-[#121826] border border-white/15 p-1.5 flex items-center justify-center">
+                          <StudioIcon src={editingProj.icon} alt="icon" fallbackType="sparkles" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-white block">Project Icon</span>
+                          <span className="text-[10px] text-[#94A3B8]">Upload image directly from device</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => iconInputRef.current?.click()}
+                        className="px-4 py-2 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 text-xs font-semibold hover:bg-blue-600 hover:text-white transition-all"
+                      >
+                        Upload Icon
+                      </button>
+                    </div>
+
+                    {/* Screenshots */}
+                    <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 space-y-3">
+                      <input ref={galleryInputRef} type="file" multiple accept="image/*" onChange={handleUploadGallery} className="hidden" />
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-xs font-bold text-white block">Visual Screenshots</span>
+                          <span className="text-[10px] text-[#94A3B8]">{editingProj.galleryImages?.length || 0} images uploaded</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => galleryInputRef.current?.click()}
+                          className="px-3.5 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-xs hover:bg-indigo-600 hover:text-white transition-all"
+                        >
+                          Add Images
+                        </button>
+                      </div>
+
+                      {editingProj.galleryImages && editingProj.galleryImages.length > 0 && (
+                        <div className="grid grid-cols-4 gap-2 pt-2">
+                          {editingProj.galleryImages.map((img, i) => (
+                            <div key={i} className="relative group rounded-xl overflow-hidden border border-white/10 aspect-video bg-black">
+                              <img src={img} alt="p" className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => setEditingProj({ ...editingProj, galleryImages: editingProj.galleryImages?.filter((_, idx) => idx !== i) })}
+                                className="absolute top-1 right-1 p-1 rounded bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Attachments */}
+                    <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 space-y-3">
+                      <input ref={docInputRef} type="file" multiple onChange={handleUploadAttachment} className="hidden" />
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-xs font-bold text-white block">Downloadable Files & Resources</span>
+                          <span className="text-[10px] text-[#94A3B8]">{editingProj.attachments?.length || 0} files attached</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => docInputRef.current?.click()}
+                          className="px-3.5 py-1.5 rounded-xl bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 text-xs hover:bg-cyan-600 hover:text-white transition-all"
+                        >
+                          Upload Files
+                        </button>
+                      </div>
+
+                      {editingProj.attachments && editingProj.attachments.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          {editingProj.attachments.map((att, i) => (
+                            <div key={i} className="flex justify-between items-center p-2.5 rounded-xl bg-[#121826] border border-white/10 text-xs">
+                              <span className="text-white font-mono truncate">{att.name} {att.size && `(${att.size})`}</span>
+                              <button
+                                type="button"
+                                onClick={() => setEditingProj({ ...editingProj, attachments: editingProj.attachments?.filter((_, idx) => idx !== i) })}
+                                className="text-red-400 p-1 hover:text-red-300"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </form>
+
+            {/* Modal Bottom Sticky Actions */}
+            <div className="px-6 py-4 border-t border-white/10 bg-[#121826] flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-[#94A3B8] font-mono">
+                Changes will sync instantly to all online clients.
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingProj(null)}
+                  className="px-5 py-2.5 rounded-xl border border-white/10 text-xs text-[#94A3B8] hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveProject}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow transition-all disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isSaving ? 'Saving & Syncing...' : 'Save & Publish Project'}</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* MODAL EDIT / CREATE APP */}
       {editingApp && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
@@ -702,6 +1157,7 @@ export default function FounderPanelPage() {
                 </div>
               </div>
 
+              {/* Status & Version */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
@@ -853,254 +1309,6 @@ export default function FounderPanelPage() {
                 </button>
                 <button type="submit" className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow">
                   Save App
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL EDIT PROJECT */}
-      {editingProj && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-3xl border border-white/15 bg-[#121826] rounded-3xl p-6 sm:p-8 space-y-6 my-8 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="text-xl font-bold text-white">
-                {isCreatingProj ? 'Create New Project' : `Edit Project: ${editingProj.name}`}
-              </h2>
-              <button onClick={() => setEditingProj(null)} className="text-[#94A3B8] hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveProject} className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
-                    Project Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editingProj.name}
-                    onChange={(e) => setEditingProj({ ...editingProj, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
-                    Tagline / Experience *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editingProj.tagline}
-                    onChange={(e) => setEditingProj({ ...editingProj, tagline: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
-                    Project Status *
-                  </label>
-                  <select
-                    value={editingProj.status}
-                    onChange={(e) => setEditingProj({ ...editingProj, status: e.target.value as AppProjectStatus })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="Ready">Ready</option>
-                    <option value="In Development">In Development</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Discontinued">Discontinued</option>
-                    <option value="Alpha">Alpha</option>
-                    <option value="Beta">Beta</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
-                    Progress: <strong className="text-blue-400">{editingProj.progress}%</strong>
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={editingProj.progress}
-                    onChange={(e) => setEditingProj({ ...editingProj, progress: Number(e.target.value) })}
-                    className="w-full mt-2 accent-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Project Tags */}
-              <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 space-y-3">
-                <div className="flex items-center gap-2">
-                  <TagIcon className="w-4 h-4 text-blue-400" />
-                  <label className="text-xs font-bold text-white">Project Custom Tags</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={projTagInput}
-                    onChange={(e) => setProjTagInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddProjTag(); } }}
-                    placeholder="Type tag (e.g. Open World, AI, Roblox) and press Add..."
-                    className="flex-1 px-3.5 py-2 rounded-xl bg-[#121826] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddProjTag}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow"
-                  >
-                    Add Tag
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {editingProj.tags && editingProj.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#182234] border border-white/10 text-xs font-mono text-blue-300"
-                    >
-                      <span>{tag}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveProjTag(tag)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Upload Icon */}
-              <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 flex items-center justify-between gap-4">
-                <input ref={iconInputRef} type="file" accept="image/*" onChange={handleUploadProjIcon} className="hidden" />
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-[#121826] border border-white/15 p-1.5 flex items-center justify-center">
-                    <StudioIcon src={editingProj.icon} alt="icon" fallbackType="sparkles" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-white block">Project Icon</span>
-                    <span className="text-[10px] text-[#94A3B8]">PNG, SVG, JPG from local machine</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => iconInputRef.current?.click()}
-                  className="px-3.5 py-2 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 text-xs font-semibold"
-                >
-                  Upload Icon
-                </button>
-              </div>
-
-              {/* Upload Gallery */}
-              <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 space-y-3">
-                <input ref={galleryInputRef} type="file" multiple accept="image/*" onChange={handleUploadGallery} className="hidden" />
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-white">Visual Screenshots ({editingProj.galleryImages?.length || 0})</span>
-                  <button
-                    type="button"
-                    onClick={() => galleryInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-xs"
-                  >
-                    Add Screenshots
-                  </button>
-                </div>
-                {editingProj.galleryImages && editingProj.galleryImages.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2 pt-2">
-                    {editingProj.galleryImages.map((img, i) => (
-                      <div key={i} className="relative group rounded-lg overflow-hidden border border-white/10 aspect-video">
-                        <img src={img} alt="p" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setEditingProj({ ...editingProj, galleryImages: editingProj.galleryImages?.filter((_, idx) => idx !== i) })}
-                          className="absolute top-1 right-1 p-1 rounded bg-red-600 text-white opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Upload Attachments */}
-              <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 space-y-3">
-                <input ref={docInputRef} type="file" multiple onChange={handleUploadAttachment} className="hidden" />
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-white">Resource Attachments ({editingProj.attachments?.length || 0})</span>
-                  <button
-                    type="button"
-                    onClick={() => docInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-xl bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 text-xs"
-                  >
-                    Upload Files
-                  </button>
-                </div>
-                {editingProj.attachments && editingProj.attachments.length > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    {editingProj.attachments.map((att, i) => (
-                      <div key={i} className="flex justify-between items-center p-2 rounded-lg bg-[#121826] border border-white/10 text-xs">
-                        <span className="text-white font-mono truncate">{att.name} {att.size && `(${att.size})`}</span>
-                        <button
-                          type="button"
-                          onClick={() => setEditingProj({ ...editingProj, attachments: editingProj.attachments?.filter((_, idx) => idx !== i) })}
-                          className="text-red-400 p-1"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
-                  Tech Architecture (comma separated)
-                </label>
-                <input
-                  type="text"
-                  value={editingProj.techStack.join(', ')}
-                  onChange={(e) => setEditingProj({ ...editingProj, techStack: e.target.value.split(',').map(s => s.trim()) })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
-                  Project Overview
-                </label>
-                <textarea
-                  rows={3}
-                  value={editingProj.overview || ''}
-                  onChange={(e) => setEditingProj({ ...editingProj, overview: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
-                  Documentation & Specifications (Markdown/Text)
-                </label>
-                <textarea
-                  rows={4}
-                  value={editingProj.detailedDocs || ''}
-                  onChange={(e) => setEditingProj({ ...editingProj, detailedDocs: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-                <button type="button" onClick={() => setEditingProj(null)} className="px-4 py-2 rounded-xl border border-white/10 text-xs text-[#94A3B8]">
-                  Cancel
-                </button>
-                <button type="submit" className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow">
-                  Save Project
                 </button>
               </div>
             </form>
