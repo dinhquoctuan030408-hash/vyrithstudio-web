@@ -1,1 +1,19 @@
-{"/_not-found/page":"/_not-found","/aboutus/page":"/aboutus","/dashboard/page":"/dashboard","/api/send-otp/route":"/api/send-otp","/page":"/","/appstore/page":"/appstore","/login/page":"/login","/project/[id]/page":"/project/[id]","/project/page":"/project","/profile/page":"/profile","/panel/page":"/panel","/icon.svg/route":"/icon.svg","/signup/page":"/signup"}
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/aboutus/page": "/aboutus",
+  "/api/auth/login/route": "/api/auth/login",
+  "/api/auth/profile/route": "/api/auth/profile",
+  "/api/auth/signup/route": "/api/auth/signup",
+  "/api/send-otp/route": "/api/send-otp",
+  "/appstore/page": "/appstore",
+  "/dashboard/page": "/dashboard",
+  "/icon.svg/route": "/icon.svg",
+  "/login/page": "/login",
+  "/page": "/",
+  "/panel/page": "/panel",
+  "/profile/page": "/profile",
+  "/project/[id]/page": "/project/[id]",
+  "/project/page": "/project",
+  "/signup/page": "/signup"
+}
