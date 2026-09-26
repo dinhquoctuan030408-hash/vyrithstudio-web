@@ -14,6 +14,7 @@ import {
 import StudioIcon from '@/components/StudioIcon';
 import StatusBadge from '@/components/StatusBadge';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+import DataSyncHUD, { SyncStatusState } from '@/components/DataSyncHUD';
 import { 
   LayoutDashboard, 
   Plus, 
@@ -21,11 +22,9 @@ import {
   Trash2, 
   Save, 
   X, 
-  CheckCircle2, 
   Upload, 
   Image as ImageIcon, 
   FileText, 
-  Paperclip, 
   Eye, 
   Layers, 
   Cpu, 
@@ -38,8 +37,7 @@ import {
   Download,
   Info,
   Code2,
-  FolderKanban,
-  Check
+  FolderKanban
 } from 'lucide-react';
 
 export default function FounderPanelPage() {
@@ -47,11 +45,16 @@ export default function FounderPanelPage() {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<'projects' | 'apps' | 'feedback'>('projects');
-  const [successMsg, setSuccessMsg] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Modal Editor Sub-tabs
   const [editorSubTab, setEditorSubTab] = useState<'general' | 'docs' | 'media' | 'tags'>('general');
+
+  const [syncStatus, setSyncStatus] = useState<SyncStatusState>({
+    isOpen: false,
+    dataType: '',
+    stageText: '',
+    progress: 0,
+    isComplete: false,
+    isError: false,
+  });
 
   // Projects State
   const [projects, setProjects] = useState<UpcomingProject[]>([]);
@@ -179,7 +182,7 @@ export default function FounderPanelPage() {
     Array.from(files).forEach(file => {
       const reader = new FileReader();
       reader.onload = () => {
-        setEditingProj(prev => prev ? {
+        setEditingProj((prev: UpcomingProject | null) => prev ? {
           ...prev,
           galleryImages: [...(prev.galleryImages || []), reader.result as string]
         } : prev);
@@ -200,7 +203,7 @@ export default function FounderPanelPage() {
           size: formatFileSize(file.size),
           type: file.type || 'file'
         };
-        setEditingProj(prev => prev ? {
+        setEditingProj((prev: UpcomingProject | null) => prev ? {
           ...prev,
           attachments: [...(prev.attachments || []), newAtt]
         } : prev);
@@ -213,7 +216,14 @@ export default function FounderPanelPage() {
     e.preventDefault();
     if (!editingProj) return;
 
-    setIsSaving(true);
+    setSyncStatus({
+      isOpen: true,
+      dataType: 'Projects Catalog',
+      stageText: 'Validating Project Schema...',
+      progress: 10,
+      isComplete: false,
+      isError: false,
+    });
 
     const parsedTech = techStackInput
       .split(',')
@@ -247,22 +257,55 @@ export default function FounderPanelPage() {
     }
 
     setProjects(updatedList);
-    await saveLiveProjects(updatedList);
     
-    setIsSaving(false);
+    await saveLiveProjects(updatedList, (stage: string, percent: number) => {
+      setSyncStatus((prev: SyncStatusState) => ({
+        ...prev,
+        stageText: stage,
+        progress: percent,
+      }));
+    });
+
+    setSyncStatus((prev: SyncStatusState) => ({
+      ...prev,
+      stageText: 'Saved and Distributed to All Devices!',
+      progress: 100,
+      isComplete: true,
+    }));
+
     setEditingProj(null);
     setIsCreatingProj(false);
-    setSuccessMsg(`Project "${finalProject.name}" saved and synchronized successfully.`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+
+    setTimeout(() => {
+      setSyncStatus((prev: SyncStatusState) => ({ ...prev, isOpen: false }));
+    }, 1200);
   };
 
   const handleDeleteProj = async (id: string) => {
     if (confirm('Delete this project permanently?')) {
+      setSyncStatus({
+        isOpen: true,
+        dataType: 'Projects Catalog',
+        stageText: 'Removing Project from Cloud...',
+        progress: 50,
+        isComplete: false,
+        isError: false,
+      });
+
       const updated = projects.filter(p => p.id !== id);
       setProjects(updated);
       await saveLiveProjects(updated);
-      setSuccessMsg('Project removed successfully.');
-      setTimeout(() => setSuccessMsg(''), 3000);
+
+      setSyncStatus((prev: SyncStatusState) => ({
+        ...prev,
+        stageText: 'Project Removed Successfully',
+        progress: 100,
+        isComplete: true,
+      }));
+
+      setTimeout(() => {
+        setSyncStatus((prev: SyncStatusState) => ({ ...prev, isOpen: false }));
+      }, 1000);
     }
   };
 
@@ -285,16 +328,37 @@ export default function FounderPanelPage() {
   };
 
   const handleToggleAppDownloadQuick = async (appId: string) => {
+    setSyncStatus({
+      isOpen: true,
+      dataType: 'App Download Policy',
+      stageText: 'Updating Download Access Toggle...',
+      progress: 40,
+      isComplete: false,
+      isError: false,
+    });
+
     const updated = apps.map(a => {
       if (a.id === appId) {
         return { ...a, downloadEnabled: a.downloadEnabled === false ? true : false };
       }
       return a;
     });
+
     setApps(updated);
-    await saveLiveApps(updated);
-    setSuccessMsg('Download button status synced globally.');
-    setTimeout(() => setSuccessMsg(''), 2500);
+    await saveLiveApps(updated, (stage: string, percent: number) => {
+      setSyncStatus((prev: SyncStatusState) => ({ ...prev, stageText: stage, progress: percent }));
+    });
+
+    setSyncStatus((prev: SyncStatusState) => ({
+      ...prev,
+      stageText: 'App Store Policy Synchronized!',
+      progress: 100,
+      isComplete: true,
+    }));
+
+    setTimeout(() => {
+      setSyncStatus((prev: SyncStatusState) => ({ ...prev, isOpen: false }));
+    }, 1000);
   };
 
   const handleAddAppTag = () => {
@@ -323,18 +387,41 @@ export default function FounderPanelPage() {
   const handleSaveApp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingApp) return;
+
+    setSyncStatus({
+      isOpen: true,
+      dataType: 'Released Application',
+      stageText: 'Uploading App Meta & Binary Link...',
+      progress: 30,
+      isComplete: false,
+      isError: false,
+    });
+
     let updated: AppItem[];
     if (isCreatingApp) {
       updated = [...apps, editingApp];
     } else {
       updated = apps.map(a => a.id === editingApp.id ? editingApp : a);
     }
+
     setApps(updated);
-    await saveLiveApps(updated);
+    await saveLiveApps(updated, (stage: string, percent: number) => {
+      setSyncStatus((prev: SyncStatusState) => ({ ...prev, stageText: stage, progress: percent }));
+    });
+
+    setSyncStatus((prev: SyncStatusState) => ({
+      ...prev,
+      stageText: 'Application Saved and Synchronized!',
+      progress: 100,
+      isComplete: true,
+    }));
+
     setEditingApp(null);
     setIsCreatingApp(false);
-    setSuccessMsg('App updated successfully.');
-    setTimeout(() => setSuccessMsg(''), 3000);
+
+    setTimeout(() => {
+      setSyncStatus((prev: SyncStatusState) => ({ ...prev, isOpen: false }));
+    }, 1000);
   };
 
   const handleDeleteApp = async (id: string) => {
@@ -377,6 +464,9 @@ export default function FounderPanelPage() {
   return (
     <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 space-y-8">
       
+      {/* HUD sync modal */}
+      <DataSyncHUD status={syncStatus} />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
         <div>
@@ -421,13 +511,6 @@ export default function FounderPanelPage() {
           </button>
         </div>
       </div>
-
-      {successMsg && (
-        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 shadow-glow">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{successMsg}</span>
-        </div>
-      )}
 
       {/* TAB 1: PROJECTS */}
       {activeTab === 'projects' && (
@@ -549,7 +632,7 @@ export default function FounderPanelPage() {
                       </div>
                     )}
 
-                    {/* Quick Download Toggle Switch */}
+                    {/* Quick Download Toggle */}
                     <div className="p-3 rounded-2xl bg-[#090D16] border border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Download className={`w-4 h-4 ${isDownloadOn ? 'text-emerald-400' : 'text-[#94A3B8]'}`} />
@@ -715,12 +798,11 @@ export default function FounderPanelPage() {
         </div>
       )}
 
-      {/* ================= STUDIO ADVANCED PROJECT EDITOR MODAL ================= */}
+      {/* MODAL EDIT PROJECT */}
       {editingProj && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
           <div className="w-full max-w-5xl border border-white/15 bg-[#0e1422] rounded-3xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden">
             
-            {/* Modal Top Header */}
             <div className="px-6 py-4 border-b border-white/10 bg-[#121826] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
@@ -734,21 +816,18 @@ export default function FounderPanelPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingProj(null)}
-                  className="p-2 text-[#94A3B8] hover:text-white rounded-xl hover:bg-white/5 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setEditingProj(null)}
+                className="p-2 text-[#94A3B8] hover:text-white rounded-xl hover:bg-white/5 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Modal Body with Left Tabs & Right Form */}
             <form onSubmit={handleSaveProject} className="flex-1 flex flex-col md:flex-row overflow-hidden">
               
-              {/* Left Sub-navigation Tabs */}
+              {/* Left Sub-tabs */}
               <div className="w-full md:w-56 p-3 border-b md:border-b-0 md:border-r border-white/10 bg-[#090D16]/60 flex md:flex-col gap-1 shrink-0 overflow-x-auto">
                 <button
                   type="button"
@@ -792,10 +871,9 @@ export default function FounderPanelPage() {
                 </button>
               </div>
 
-              {/* Right Tab Content Panel */}
+              {/* Right Tab Content */}
               <div className="flex-1 p-5 sm:p-7 overflow-y-auto space-y-5 bg-[#0e1422]">
                 
-                {/* SUBTAB 1: GENERAL INFO */}
                 {editorSubTab === 'general' && (
                   <div className="space-y-4 animate-in fade-in duration-150">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -880,7 +958,6 @@ export default function FounderPanelPage() {
                   </div>
                 )}
 
-                {/* SUBTAB 2: TECH & TAGS */}
                 {editorSubTab === 'tags' && (
                   <div className="space-y-5 animate-in fade-in duration-150">
                     <div>
@@ -894,13 +971,10 @@ export default function FounderPanelPage() {
                         placeholder="Luau, C++, Unity, ECS, AI..."
                         className="w-full px-4 py-2.5 rounded-xl bg-[#090D16] border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
                       />
-                      <p className="text-[10px] text-[#94A3B8] mt-1 font-mono">Example: Luau, C++, Vulkan, React</p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-[#090D16] border border-white/10 space-y-3">
-                      <label className="text-xs font-bold text-white block">
-                        Custom Badges & Tags
-                      </label>
+                      <label className="text-xs font-bold text-white block">Custom Badges & Tags</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="text"
@@ -940,40 +1014,20 @@ export default function FounderPanelPage() {
                   </div>
                 )}
 
-                {/* SUBTAB 3: MARKDOWN & MATH SPECS */}
                 {editorSubTab === 'docs' && (
                   <div className="space-y-4 animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block font-bold">
-                          Documentation & Technical Specifications
-                        </label>
-                        <p className="text-[10px] text-[#94A3B8] font-mono">
-                          Supports Markdown headers (#, ##), Bold (**text**), Code blocks (```), and Math Formulas (
-..
-).
-                        </p>
-                      </div>
-                    </div>
-
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* Editor Input */}
                       <div>
                         <span className="text-[10px] uppercase font-mono tracking-wider text-blue-400 block mb-1">Raw Markdown Source</span>
                         <textarea
                           rows={13}
                           value={editingProj.detailedDocs || ''}
                           onChange={(e) => setEditingProj({ ...editingProj, detailedDocs: e.target.value })}
-                          placeholder="## System Architecture&#10;- Feature 1&#10;- [x] Milestone Complete&#10;&#10;```luau&#10;print('Hello')&#10;```&#10;&#10;
-E=mc 
-2
- 
-"
+                          placeholder="## System Architecture&#10;- Feature 1&#10;&#10;```luau&#10;print('Hello')&#10;```&#10;&#10;$$E = mc^2$$"
                           className="w-full h-[320px] p-3.5 rounded-2xl bg-[#090D16] border border-white/10 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-blue-500 resize-none scrollbar-thin"
                         />
                       </div>
 
-                      {/* Live Preview */}
                       <div>
                         <span className="text-[10px] uppercase font-mono tracking-wider text-emerald-400 block mb-1">Live Render Preview</span>
                         <div className="w-full h-[320px] p-4 rounded-2xl bg-[#090D16]/70 border border-white/10 overflow-y-auto scrollbar-thin shadow-inner">
@@ -988,7 +1042,6 @@ E=mc
                   </div>
                 )}
 
-                {/* SUBTAB 4: MEDIA & ATTACHMENTS */}
                 {editorSubTab === 'media' && (
                   <div className="space-y-5 animate-in fade-in duration-150">
                     {/* Icon */}
@@ -1074,7 +1127,7 @@ E=mc
                                 onClick={() => setEditingProj({ ...editingProj, attachments: editingProj.attachments?.filter((_, idx) => idx !== i) })}
                                 className="text-red-400 p-1 hover:text-red-300"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3 h-3" />
                               </button>
                             </div>
                           ))}
@@ -1087,7 +1140,6 @@ E=mc
               </div>
             </form>
 
-            {/* Modal Bottom Sticky Actions */}
             <div className="px-6 py-4 border-t border-white/10 bg-[#121826] flex items-center justify-between shrink-0">
               <span className="text-[11px] text-[#94A3B8] font-mono">
                 Changes will sync instantly to all online clients.
@@ -1103,11 +1155,10 @@ E=mc
                 <button
                   type="button"
                   onClick={handleSaveProject}
-                  disabled={isSaving}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow transition-all disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow transition-all"
                 >
                   <Save className="w-4 h-4" />
-                  <span>{isSaving ? 'Saving & Syncing...' : 'Save & Publish Project'}</span>
+                  <span>Save & Publish Project</span>
                 </button>
               </div>
             </div>
@@ -1157,7 +1208,6 @@ E=mc
                 </div>
               </div>
 
-              {/* Status & Version */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[11px] uppercase tracking-wider text-[#94A3B8] font-mono block mb-1">
@@ -1188,7 +1238,7 @@ E=mc
                 </div>
               </div>
 
-              {/* Download Toggle in Form */}
+              {/* Download Toggle */}
               <div className="p-4 rounded-2xl bg-[#090D16] border border-blue-500/20 shadow-glow flex items-center justify-between">
                 <div>
                   <label className="text-xs font-bold text-white block">Download Button Status</label>

@@ -4,17 +4,19 @@ import { STUDIO_CONFIG, UpcomingProject, AppItem, FeedbackThread } from '@/data/
 
 export const dynamic = 'force-dynamic';
 
-const KEY_PROJECTS = 'vyrith_cloud_projects';
-const KEY_APPS = 'vyrith_cloud_apps';
-const KEY_FEEDBACKS = 'vyrith_cloud_feedbacks';
+const KEY_PROJECTS = 'vyrith_cloud_projects_v2';
+const KEY_APPS = 'vyrith_cloud_apps_v2';
+const KEY_FEEDBACKS = 'vyrith_cloud_feedbacks_v2';
+const KEY_META_TIMESTAMPS = 'vyrith_meta_timestamps';
 
 export async function GET() {
   try {
     if (redis) {
-      const [cloudProjects, cloudApps, cloudFeedbacks] = await Promise.all([
+      const [cloudProjects, cloudApps, cloudFeedbacks, metaTimestamps] = await Promise.all([
         redis.get(KEY_PROJECTS),
         redis.get(KEY_APPS),
         redis.get(KEY_FEEDBACKS),
+        redis.get(KEY_META_TIMESTAMPS),
       ]);
 
       return NextResponse.json({
@@ -23,6 +25,7 @@ export async function GET() {
         projects: (cloudProjects as UpcomingProject[]) || null,
         apps: (cloudApps as AppItem[]) || null,
         feedbacks: (cloudFeedbacks as FeedbackThread[]) || null,
+        timestamps: metaTimestamps || {},
       });
     }
 
@@ -32,6 +35,7 @@ export async function GET() {
       projects: null,
       apps: null,
       feedbacks: null,
+      timestamps: {},
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -41,16 +45,28 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { type, data } = body;
+    const { type, data, timestamp } = body;
+    const now = timestamp || Date.now();
 
     if (redis) {
-      if (type === 'projects') await redis.set(KEY_PROJECTS, data);
-      if (type === 'apps') await redis.set(KEY_APPS, data);
-      if (type === 'feedbacks') await redis.set(KEY_FEEDBACKS, data);
-      return NextResponse.json({ success: true, cloudSaved: true });
+      const metaTimestamps: any = (await redis.get(KEY_META_TIMESTAMPS)) || {};
+
+      if (type === 'projects') {
+        await redis.set(KEY_PROJECTS, data);
+        metaTimestamps.projects = now;
+      } else if (type === 'apps') {
+        await redis.set(KEY_APPS, data);
+        metaTimestamps.apps = now;
+      } else if (type === 'feedbacks') {
+        await redis.set(KEY_FEEDBACKS, data);
+        metaTimestamps.feedbacks = now;
+      }
+
+      await redis.set(KEY_META_TIMESTAMPS, metaTimestamps);
+      return NextResponse.json({ success: true, cloudSaved: true, timestamp: now });
     }
 
-    return NextResponse.json({ success: true, cloudSaved: false });
+    return NextResponse.json({ success: true, cloudSaved: false, timestamp: now });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
